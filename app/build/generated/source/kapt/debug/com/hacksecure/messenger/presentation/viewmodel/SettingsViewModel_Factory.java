@@ -1,0 +1,52 @@
+package com.hacksecure.messenger.presentation.viewmodel;
+
+import android.content.Context;
+import com.hacksecure.messenger.domain.repository.IdentityRepository;
+import dagger.internal.DaggerGenerated;
+import dagger.internal.Factory;
+import dagger.internal.QualifierMetadata;
+import dagger.internal.ScopeMetadata;
+import javax.annotation.processing.Generated;
+import javax.inject.Provider;
+
+@ScopeMetadata
+@QualifierMetadata("dagger.hilt.android.qualifiers.ApplicationContext")
+@DaggerGenerated
+@Generated(
+    value = "dagger.internal.codegen.ComponentProcessor",
+    comments = "https://dagger.dev"
+)
+@SuppressWarnings({
+    "unchecked",
+    "rawtypes",
+    "KotlinInternal",
+    "KotlinInternalInJava",
+    "cast"
+})
+public final class SettingsViewModel_Factory implements Factory<SettingsViewModel> {
+  private final Provider<IdentityRepository> identityRepositoryProvider;
+
+  private final Provider<Context> appContextProvider;
+
+  public SettingsViewModel_Factory(Provider<IdentityRepository> identityRepositoryProvider,
+      Provider<Context> appContextProvider) {
+    this.identityRepositoryProvider = identityRepositoryProvider;
+    this.appContextProvider = appContextProvider;
+  }
+
+  @Override
+  public SettingsViewModel get() {
+    return newInstance(identityRepositoryProvider.get(), appContextProvider.get());
+  }
+
+  public static SettingsViewModel_Factory create(
+      Provider<IdentityRepository> identityRepositoryProvider,
+      Provider<Context> appContextProvider) {
+    return new SettingsViewModel_Factory(identityRepositoryProvider, appContextProvider);
+  }
+
+  public static SettingsViewModel newInstance(IdentityRepository identityRepository,
+      Context appContext) {
+    return new SettingsViewModel(identityRepository, appContext);
+  }
+}

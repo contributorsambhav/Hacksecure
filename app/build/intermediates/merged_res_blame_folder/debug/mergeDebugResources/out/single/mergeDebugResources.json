@@ -1,0 +1,6 @@
+[
+    {
+        "merged": "com.hacksecure.messenger.app-debug-76:/xml_data_extraction_rules.xml.flat",
+        "source": "com.hacksecure.messenger.app-main-78:/xml/data_extraction_rules.xml"
+    }
+]

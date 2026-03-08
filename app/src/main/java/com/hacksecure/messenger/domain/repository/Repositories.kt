@@ -1,0 +1,29 @@
+// domain/repository/Repositories.kt — interfaces
+package com.hacksecure.messenger.domain.repository
+
+import com.hacksecure.messenger.domain.model.*
+import kotlinx.coroutines.flow.Flow
+
+interface IdentityRepository {
+    suspend fun getLocalIdentity(): LocalIdentity?
+    suspend fun generateIdentity(): LocalIdentity
+    suspend fun deleteIdentity()
+}
+
+interface ContactRepository {
+    fun getContacts(): Flow<List<Contact>>
+    suspend fun getContact(id: String): Contact?
+    suspend fun getContactByIdentityHash(hex: String): Contact?
+    suspend fun saveContact(contact: Contact)
+    suspend fun updateContact(contact: Contact)
+    suspend fun deleteContact(id: String)
+}
+
+interface MessageRepository {
+    fun getMessages(conversationId: String): Flow<List<Message>>
+    suspend fun saveMessage(message: Message, plaintextBytes: ByteArray)
+    suspend fun getMessage(id: String): Message?
+    suspend fun deleteExpiredMessages()
+    suspend fun deleteConversationMessages(conversationId: String)
+    suspend fun getMaxCounter(conversationId: String, senderHex: String): Long
+}

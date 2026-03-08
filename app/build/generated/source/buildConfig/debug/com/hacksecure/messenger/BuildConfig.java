@@ -1,0 +1,20 @@
+/**
+ * Automatically generated file. DO NOT MODIFY
+ */
+package com.hacksecure.messenger;
+
+public final class BuildConfig {
+  public static final boolean DEBUG = Boolean.parseBoolean("true");
+  public static final String APPLICATION_ID = "com.hacksecure.messenger.debug";
+  public static final String BUILD_TYPE = "debug";
+  public static final int VERSION_CODE = 1;
+  public static final String VERSION_NAME = "1.0.0-debug";
+  // Field from default config.
+  public static final String API_BASE_URL = "http://10.155.36.9:8443";
+  // Field from default config.
+  public static final String APP_VERSION = "1.0.0";
+  // Field from default config.
+  public static final String RELAY_BASE_URL = "ws://10.155.36.9:8443";
+  // Field from default config.
+  public static final String SERVER_PUBLIC_KEY_HEX = "bf6d828ba46445d0632b8a1810ff68b97a3aa2ed06146458c0592f8706333cb7";
+}
