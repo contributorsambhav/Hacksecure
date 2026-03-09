@@ -33,11 +33,11 @@ android {
         buildConfigField(
             "String",
             "SERVER_PUBLIC_KEY_HEX",
-            "\"bcedcb9616b2a1112c98e27f503870e4018c43bc1ae543ac49cfddc4616e4730\""
+            "\"6e881b204526148e571276caa7290b247481c1b1ae0018da41d37e19d63ea3f2\""
         )
         // LAN IP for release / physical device builds
-        buildConfigField("String", "RELAY_BASE_URL", "\"ws://10.155.36.9:8443\"")
-        buildConfigField("String", "API_BASE_URL", "\"http://10.155.36.9:8443\"")
+        buildConfigField("String", "RELAY_BASE_URL", "\"ws://13.203.169.244:8443\"")
+        buildConfigField("String", "API_BASE_URL", "\"http://13.203.169.244:8443\"")
         buildConfigField("String", "APP_VERSION", "\"1.0.0\"")
     }
 
@@ -53,11 +53,9 @@ android {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            // Debug allows ws:// and http:// for local relay server
+            // Cleartext allowed — EC2 server runs plain ws:// and http://
             manifestPlaceholders["usesCleartextTraffic"] = "true"
-            // 10.0.2.2 = Android emulator's alias for host localhost (Docker port 8443)
-            buildConfigField("String", "RELAY_BASE_URL", "\"ws://10.0.2.2:8443\"")
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8443\"")
+            // Uses RELAY_BASE_URL and API_BASE_URL from defaultConfig (EC2 Elastic IP)
         }
     }
     compileOptions {

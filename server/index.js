@@ -49,6 +49,11 @@ console.log(`Server public key: ${Buffer.from(serverKeyPair.publicKey).toString(
 const conversationSockets = new Map(); // conversationId → Set<ws>
 const presenceMap = new Map();         // identityHash → { connectionToken, lastSeen }
 
+// Offline message buffer: conversationId → [{data: Buffer, ts: number}]
+const messageBuffer = new Map();
+const MAX_BUFFER_PER_CONV = 50;
+const BUFFER_TTL_MS = 3_600_000; // 1 hour
+
 // ══════════════════════════════════════════════════════════════════════════════
 // EXPRESS REST API
 // ══════════════════════════════════════════════════════════════════════════════
@@ -173,6 +178,19 @@ wss.on("connection", (ws, req) => {
   ws.conversationId = conversationId;
   console.log(`Client joined conversation ${conversationId.slice(0, 16)}... (${room.size} members)`);
 
+  // Deliver any buffered messages to the newly-connected participant
+  const backlog = messageBuffer.get(conversationId);
+  if (backlog && backlog.length > 0) {
+    const now = Date.now();
+    for (const entry of backlog) {
+      if (now - entry.ts < BUFFER_TTL_MS && ws.readyState === WebSocket.OPEN) {
+        ws.send(entry.data, { binary: true });
+      }
+    }
+    messageBuffer.delete(conversationId);
+    console.log(`  → delivered ${backlog.length} buffered message(s) to late joiner`);
+  }
+
   ws.on("message", (data, isBinary) => {
     // ALL messages are binary — relay to all OTHER sockets in the same conversation
     if (!isBinary) {
@@ -206,6 +224,16 @@ wss.on("connection", (ws, req) => {
       }
     }
     console.log(`  → relayed to ${relayed} peers`);
+
+    // If no peer was online, buffer the packet for offline delivery
+    if (relayed === 0) {
+      const buf = messageBuffer.get(conversationId) || [];
+      if (buf.length < MAX_BUFFER_PER_CONV) {
+        buf.push({ data: Buffer.from(bytes), ts: Date.now() });
+        messageBuffer.set(conversationId, buf);
+        console.log(`  → buffered for offline delivery (${buf.length} queued)`);
+      }
+    }
   });
 
   ws.on("close", () => {
@@ -241,6 +269,14 @@ setInterval(() => {
   const cutoff = Date.now() - 300_000;
   for (const [hash, info] of presenceMap.entries()) {
     if (info.lastSeen < cutoff) presenceMap.delete(hash);
+  }
+
+  // Cleanup expired offline message buffer entries
+  const bufExpiry = Date.now() - BUFFER_TTL_MS;
+  for (const [convId, buf] of messageBuffer.entries()) {
+    const fresh = buf.filter(e => e.ts > bufExpiry);
+    if (fresh.length === 0) messageBuffer.delete(convId);
+    else messageBuffer.set(convId, fresh);
   }
 }, 60_000);
 

@@ -10,7 +10,7 @@ import net.sqlcipher.database.SupportFactory;
 @androidx.room.Dao()
 public abstract interface MessageDao {
     
-    @androidx.room.Query(value = "SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY counter ASC")
+    @androidx.room.Query(value = "SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestampMs ASC, rowid ASC")
     @org.jetbrains.annotations.NotNull()
     public abstract kotlinx.coroutines.flow.Flow<java.util.List<com.hacksecure.messenger.data.local.db.MessageEntity>> getMessages(@org.jetbrains.annotations.NotNull()
     java.lang.String conversationId);

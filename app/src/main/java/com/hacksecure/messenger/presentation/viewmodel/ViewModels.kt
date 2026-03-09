@@ -6,19 +6,15 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hacksecure.messenger.data.remote.api.PresenceRequest
 import com.hacksecure.messenger.data.remote.api.RelayApi
 import com.hacksecure.messenger.data.remote.ServerConfig
-import com.hacksecure.messenger.data.remote.api.TicketRequest
 import com.hacksecure.messenger.data.remote.websocket.RelayEvent
-import com.hacksecure.messenger.data.remote.websocket.RelayWebSocketClient
 import com.hacksecure.messenger.domain.crypto.*
 import com.hacksecure.messenger.domain.model.*
 import com.hacksecure.messenger.domain.repository.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -293,10 +289,10 @@ data class ChatUiState(
     val contact: Contact? = null,
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
     val sessionEstablished: Boolean = false,
-    val defaultExpirySeconds: Int = 0,
+    val defaultExpirySeconds: Int = 1800,
     val isLoading: Boolean = true,
     val inputText: String = "",
-    val selectedExpirySeconds: Int = 0,
+    val selectedExpirySeconds: Int = 1800,
     val serverRelayUrl: String = ""
 )
 
@@ -315,11 +311,10 @@ class ChatViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val identityRepository: IdentityRepository,
     private val identityKeyManager: IdentityKeyManager,
-    private val sessionKeyManager: SessionKeyManager,
-    private val handshakeManager: HandshakeManager,
-    private val relayWebSocketClient: RelayWebSocketClient,
     private val relayApi: RelayApi,
-    private val serverConfig: ServerConfig
+    private val serverConfig: ServerConfig,
+    private val backgroundConnectionManager: com.hacksecure.messenger.data.remote.BackgroundConnectionManager,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context
 ) : ViewModel(), DefaultLifecycleObserver {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -335,24 +330,15 @@ class ChatViewModel @Inject constructor(
     @Volatile private var activeContact: Contact? = null
     @Volatile private var myIdentity: LocalIdentity? = null
 
-    /** Our ephemeral X25519 keypair for the current handshake round. */
-    @Volatile private var ourEphemeralPair: SessionKeyManager.EphemeralKeyPair? = null
-
-    /**
-     * The serialized 97-byte HANDSHAKE_OFFER we sent. Kept so we can re-send it to a peer
-     * that connected after our initial offer (relay doesn't buffer — they missed it).
-     */
-    @Volatile private var ourOfferPacket: ByteArray? = null
-
-    /** Job controlling the relay event-collection coroutine; cancelled before each reconnect. */
-    private var relayJob: Job? = null
-
     /** In-memory de-duplication for relay messages processed this session. */
     private val seenMessageIds = mutableSetOf<String>()
 
-    /** Hash ratchets keyed by conversationId â€” zeroized on ViewModel clear. */
-    private val sendRatchets = mutableMapOf<String, HashRatchet>()
-    private val recvRatchets = mutableMapOf<String, HashRatchet>()
+    /**
+     * Tracks the single scheduled-expiry coroutine.  We only ever need one: it fires at the
+     * nearest upcoming deadline, calls deleteExpiredMessages() (which cleans ALL due messages),
+     * and the Room flow re-emits triggering a reschedule for the next nearest deadline.
+     */
+    private var nextExpiryJob: kotlinx.coroutines.Job? = null
 
     // â”€â”€ Initialisation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -369,14 +355,26 @@ class ChatViewModel @Inject constructor(
             conversationId = buildConversationId(identity.identityHex, contact.identityHex)
             activeContact = contact
             myIdentity = identity
-            _uiState.update { it.copy(contact = contact, isLoading = false) }
 
-            // Connect relay concurrently â€” does not block the message-collection Flow below
+            // Read persisted default expiry (set in Settings, defaults to 30 minutes)
+            val defaultExpiry = appContext
+                .getSharedPreferences("hacksecure_settings", android.content.Context.MODE_PRIVATE)
+                .getInt("default_expiry_seconds", 1800)
+
+            _uiState.update { it.copy(contact = contact, isLoading = false, selectedExpirySeconds = defaultExpiry) }
+
+            // Establish or reuse background connection via BackgroundConnectionManager
             connectRelay(conversationId!!, identity, contact)
+
+            // Immediately delete any messages that already expired while the app was closed.
+            withContext(Dispatchers.IO) {
+                try { messageRepository.deleteExpiredMessages() } catch (_: Exception) {}
+            }
 
             // Room Flow suspends here indefinitely, updating UI whenever DB changes
             messageRepository.getMessages(conversationId!!).collect { messages ->
                 _uiState.update { it.copy(messages = messages) }
+                scheduleNextExpiry(messages)
             }
         }
     }
@@ -389,101 +387,42 @@ class ChatViewModel @Inject constructor(
      * stale coroutines.
      */
     private fun connectRelay(convId: String, identity: LocalIdentity, contact: Contact) {
-        // Cancel any existing relay session
-        relayJob?.cancel()
-        // Discard the existing session — fresh handshake required on every new connection
+        // Clear any locally-cached processor reference; BGM owns the session now
         messageProcessor = null
-        ourEphemeralPair?.zeroizePrivate()
-        ourEphemeralPair = null
-        ourOfferPacket = null
-        _uiState.update { it.copy(connectionState = ConnectionState.CONNECTING, sessionEstablished = false) }
-
-        relayJob = viewModelScope.launch {
-            try {
-                // Store current server URL for troubleshooting UI
-                _uiState.update { it.copy(serverRelayUrl = serverConfig.relayBaseUrl) }
-
-                // Register presence and get auth token
-                val connectionToken = UUID.randomUUID().toString()
-                val presence = withContext(Dispatchers.IO) {
-                    relayApi.registerPresence(
-                        url = "${serverConfig.apiBaseUrl}/api/v1/presence",
-                        request = PresenceRequest(
-                            identity_hash = identity.identityHex,
-                            connection_token = connectionToken
-                        )
-                    )
-                }
-                val authToken = presence.token ?: connectionToken
-
-                // Request session ticket so server can authorise the conversation
-                try {
-                    val sortedIds = listOf(identity.identityHex, contact.identityHex).sorted()
-                    withContext(Dispatchers.IO) {
-                        relayApi.requestTicket(
-                            url = "${serverConfig.apiBaseUrl}/api/v1/ticket",
-                            request = TicketRequest(a_id = sortedIds[0], b_id = sortedIds[1])
-                        )
-                    }
-                } catch (_: Exception) { /* ticket is advisory; failure does not block connection */ }
-
-                relayWebSocketClient.connect(convId, authToken)
-
-                // Collect relay events sequentially â€” each event is fully handled before
-                // the next is dispatched, preventing handshake race conditions.
-                relayWebSocketClient.events.collect { event ->
-                    when (event) {
-                        is RelayEvent.Connected -> {
-                            // Generate ephemeral keypair and send HANDSHAKE_OFFER on
-                            // Dispatchers.Default so we don't block the Main thread.
-                            // Because we use withContext (not launch), the next event will
-                            // NOT be dispatched until ourEphemeralPair is set â€” eliminating
-                            // the race between sending and receiving the peer's offer.
-                            val (offerPacket, ephemeralPair) = withContext(Dispatchers.Default) {
-                                handshakeManager.createOffer()
-                            }
-                            ourEphemeralPair = ephemeralPair
-                            ourOfferPacket = offerPacket   // keep a copy for late-joiner re-send
-                            withContext(Dispatchers.IO) {
-                                relayWebSocketClient.send(
-                                    conversationId = convId,
-                                    messageId = "hs_${UUID.randomUUID()}",
-                                    packet = offerPacket
-                                )
-                            }
-                            _uiState.update { it.copy(connectionState = ConnectionState.CONNECTED_RELAY) }
-                        }
-
-                        is RelayEvent.MessageReceived -> {
-                            // Guard: only handle packets belonging to this conversation
-                            if (event.message.conversationId == convId) {
-                                handleIncomingPacket(event.message.messageId, event.message.packetBytes, contact, identity)
-                            }
-                        }
-
-                        is RelayEvent.Disconnected -> {
-                            _uiState.update { it.copy(connectionState = ConnectionState.DISCONNECTED) }
-                        }
-
-                        is RelayEvent.Error -> {
-                            _uiState.update { it.copy(connectionState = ConnectionState.ERROR) }
-                            _events.emit(ChatEvent.ShowError("Connection error â€” retryingâ€¦"))
-                        }
-                    }
-                }
-            } catch (_: CancellationException) {
-                // Normal cancellation from relayJob?.cancel() â€” do nothing
-            } catch (e: Exception) {
-                _uiState.update { it.copy(connectionState = ConnectionState.ERROR) }
-                _events.emit(ChatEvent.ShowError("Could not connect to relay server"))
-            }
+        _uiState.update {
+            it.copy(
+                connectionState = ConnectionState.CONNECTING,
+                sessionEstablished = false,
+                serverRelayUrl = serverConfig.relayBaseUrl
+            )
         }
+
+        // If BGM already has an established session for this conversation, adopt it immediately
+        backgroundConnectionManager.getMessageProcessor(convId)?.let { existingProcessor ->
+            messageProcessor = existingProcessor
+            _uiState.update { it.copy(sessionEstablished = true, connectionState = ConnectionState.CONNECTED_RELAY) }
+        }
+
+        // Register as the active chat handler so BGM routes incoming packets here
+        backgroundConnectionManager.registerChatHandler(
+            convId = convId,
+            packetHandler = { msgId, packetBytes -> receiveMessage(msgId, packetBytes) },
+            onSessionReady = { processor ->
+                messageProcessor = processor
+                _uiState.update { it.copy(sessionEstablished = true, connectionState = ConnectionState.CONNECTED_RELAY) }
+                viewModelScope.launch { _events.emit(ChatEvent.SessionSecured) }
+            },
+            onConnectionStateChange = { newState ->
+                _uiState.update { it.copy(connectionState = newState) }
+            }
+        )
+
+        // Ensure BGM is connected for this conversation (idempotent)
+        backgroundConnectionManager.ensureConnected(identity, contact)
     }
 
-    // â”€â”€ App Lifecycle â€” reconnect when app returns from background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
+    // App Lifecycle -- reconnect when app returns from background
     override fun onStart(owner: LifecycleOwner) {
-        if (relayWebSocketClient.isConnected()) return
         val convId = conversationId ?: return
         val contact = activeContact ?: return
 
@@ -496,109 +435,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    // â”€â”€ DH Handshake â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-    /**
-     * Discriminates between a HANDSHAKE_OFFER and an encrypted MESSAGE, then
-     * routes accordingly.  Called for every packet received from the relay.
-     */
-    private fun handleIncomingPacket(
-        messageId: String,
-        packetBytes: ByteArray,
-        contact: Contact,
-        myIdentity: LocalIdentity
-    ) {
-        if (handshakeManager.isHandshakeOffer(packetBytes)) {
-            completeHandshake(packetBytes, contact, myIdentity)
-        } else {
-            receiveMessage(messageId, packetBytes)
-        }
-    }
-
-    /**
-     * Processes a peer HANDSHAKE_OFFER: verifies the Ed25519 signature, performs
-     * X25519 DH, and establishes the session.
-     *
-     * If the session is already established (e.g. duplicate offer), this is a no-op
-     * so the ratchet state is not corrupted.
-     */
-    private fun completeHandshake(offerBytes: ByteArray, contact: Contact, identity: LocalIdentity) {
-        // Ignore duplicate offers once we have a live session
-        if (messageProcessor != null) return
-
-        // ── Late-joiner fix ───────────────────────────────────────────────────────────
-        // The relay server does NOT buffer packets. If we sent our offer before the peer
-        // connected, they never received it. When we receive the peer's offer, echo our
-        // stored offer back so they can also complete the handshake.
-        ourOfferPacket?.let { storedOffer ->
-            val convId = conversationId ?: return
-            viewModelScope.launch(Dispatchers.IO) {
-                relayWebSocketClient.send(
-                    conversationId = convId,
-                    messageId = "hs_echo_${UUID.randomUUID()}",
-                    packet = storedOffer
-                )
-            }
-        }
-
-        val ephemeralPair = ourEphemeralPair ?: run {
-            // Our own offer hasn't been prepared yet — extremely rare timing edge-case;
-            // the peer's offer will be ignored and the session established on the next
-            // connection round (relay backoff reconnect).
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.Default) {
-            try {
-                val sessionKey = handshakeManager.deriveSessionKey(
-                    offerBytes = offerBytes,
-                    peerIdentityPublicKey = contact.publicKeyBytes,
-                    ourEphemeralPair = ephemeralPair,   // private key is zeroized inside
-                    myIdentityHash = identity.identityHash,
-                    peerIdentityHash = contact.identityHash
-                )
-                // Clear reference â€” private key already zeroized inside deriveSessionKey
-                ourEphemeralPair = null
-
-                onSessionEstablished(sessionKey, contact, identity)
-                // sessionKey is zeroized inside onSessionEstablished after creating ratchets
-            } catch (e: CryptoError.SignatureInvalid) {
-                _events.emit(ChatEvent.ShowError("Handshake rejected â€” invalid signature from peer"))
-            } catch (e: Exception) {
-                _events.emit(ChatEvent.ShowError("Failed to establish secure session"))
-            }
-        }
-    }
-
-    /**
-     * Installs a fully-established session into the ViewModel.
-     * Also callable externally (e.g. for testing or future manual key exchange flows).
-     *
-     * @param sessionKey 32-byte root ratchet key â€” ZEROIZED by this function after use
-     */
-    fun onSessionEstablished(sessionKey: ByteArray, contact: Contact, myIdentity: LocalIdentity) {
-        viewModelScope.launch(Dispatchers.Default) {
-            val convId = conversationId ?: return@launch
-
-            val sendRatchet = HashRatchet(sessionKey.copyOf())
-            val recvRatchet = HashRatchet(sessionKey.copyOf())
-            sessionKey.fill(0) // zeroize root key after creating both ratchets
-
-            sendRatchets[convId] = sendRatchet
-            recvRatchets[convId] = recvRatchet
-
-            messageProcessor = MessageProcessor(
-                sendRatchet = sendRatchet,
-                recvRatchet = recvRatchet,
-                identityKeyManager = identityKeyManager,
-                peerPublicKeyBytes = contact.publicKeyBytes,
-                myIdentityHash = myIdentity.identityHash
-            )
-
-            _uiState.update { it.copy(sessionEstablished = true, connectionState = ConnectionState.CONNECTED_RELAY) }
-            _events.emit(ChatEvent.SessionSecured)
-        }
-    }
 
     // â”€â”€ Input helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -680,11 +516,11 @@ class ChatViewModel @Inject constructor(
                     messageRepository.saveMessage(message, plaintextBytes)
                 }
 
-                // Step 3 & 4: send, then update state
+                // Step 3 & 4: send via BGM's WebSocket, then update state
                 if (wirePacketBytes != null) {
                     val sendSuccess = withContext(Dispatchers.IO) {
-                        relayWebSocketClient.send(
-                            conversationId = convId,
+                        backgroundConnectionManager.sendPacket(
+                            convId = convId,
                             messageId = messageId,
                             packet = wirePacketBytes
                         )
@@ -711,75 +547,52 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Decrypts and persists an incoming wire-packet received from the relay.
-     *
-     * De-duplicates using the relay-level [messageId] so retransmits (network glitches)
-     * are silently discarded.
+     * De-duplicates on [messageId] so relay retransmits are silently dropped.
+     * Called from BGM's packet handler (already on a background thread).
      */
-    private fun receiveMessage(messageId: String, packetBytes: ByteArray) {
-        if (!seenMessageIds.add(messageId)) return // duplicate â€” discard
-
+    private suspend fun receiveMessage(messageId: String, packetBytes: ByteArray) {
+        if (!seenMessageIds.add(messageId)) return
         val processor = messageProcessor ?: return
         val convId = conversationId ?: return
+        try {
+            val (plaintextBytes, header) = withContext(Dispatchers.Default) { processor.receive(packetBytes) }
+            val text = plaintextBytes.toString(Charsets.UTF_8)
+            val now = System.currentTimeMillis()
+            val message = Message(
+                id = UUID.randomUUID().toString(),
+                conversationId = convId,
+                senderId = header.senderId.toHexString(),
+                content = text,
+                timestampMs = header.timestampMs,
+                counter = header.counter,
+                expirySeconds = header.expirySeconds,
+                expiryDeadlineMs = if (header.expirySeconds > 0) now + (header.expirySeconds * 1000L) else null,
+                isOutgoing = false,
+                state = MessageState.DELIVERED,
+                messageType = header.messageType
+            )
+            withContext(Dispatchers.IO) { messageRepository.saveMessage(message, plaintextBytes) }
+        } catch (e: CryptoError.SignatureInvalid) { _events.emit(ChatEvent.MessageRejected("signature_invalid")) }
+        catch (e: CryptoError.TimestampStale) { _events.emit(ChatEvent.MessageRejected("timestamp_stale")) }
+        catch (e: CryptoError.ReplayDetected) { _events.emit(ChatEvent.MessageRejected("replay_detected")) }
+        catch (e: CryptoError.AEADAuthFailed) { _events.emit(ChatEvent.MessageRejected("aead_auth_failed")) }
+        catch (e: CryptoError) { _events.emit(ChatEvent.MessageRejected("crypto_error")) }
+        catch (e: CancellationException) { throw e }
+        catch (e: Exception) { _events.emit(ChatEvent.MessageRejected("parse_error")) }
+    }
 
-        viewModelScope.launch(Dispatchers.Default) {
-            try {
-                val (plaintextBytes, header) = processor.receive(packetBytes)
-                val text = plaintextBytes.toString(Charsets.UTF_8)
-                val now = System.currentTimeMillis()
-                val storedId = UUID.randomUUID().toString()
-
-                val message = Message(
-                    id = storedId,
-                    conversationId = convId,
-                    senderId = header.senderId.toHexString(),
-                    content = text,
-                    timestampMs = header.timestampMs,
-                    counter = header.counter,
-                    expirySeconds = header.expirySeconds,
-                    expiryDeadlineMs = if (header.expirySeconds > 0)
-                        now + (header.expirySeconds * 1000L) else null,
-                    isOutgoing = false,
-                    state = MessageState.DELIVERED,
-                    messageType = header.messageType
-                )
-
-                withContext(Dispatchers.IO) {
-                    messageRepository.saveMessage(message, plaintextBytes)
-                }
-
-            } catch (e: CryptoError.SignatureInvalid) {
-                _events.emit(ChatEvent.MessageRejected("signature_invalid"))
-            } catch (e: CryptoError.TimestampStale) {
-                _events.emit(ChatEvent.MessageRejected("timestamp_stale"))
-            } catch (e: CryptoError.ReplayDetected) {
-                _events.emit(ChatEvent.MessageRejected("replay_detected"))
-            } catch (e: CryptoError.AEADAuthFailed) {
-                _events.emit(ChatEvent.MessageRejected("aead_auth_failed"))
-            } catch (e: CryptoError) {
-                _events.emit(ChatEvent.MessageRejected("crypto_error"))
-            } catch (e: CancellationException) {
-                throw e  // never swallow coroutine cancellation
-            } catch (e: Exception) {
-                // Catches malformed wire data (e.g. BufferUnderflowException)
-                // Prevents uncaught RuntimeExceptions from crashing the app.
-                _events.emit(ChatEvent.MessageRejected("parse_error"))
-            }
+    /** Triggers a local expiry sweep: deletes expired messages and their keys from DB. */
+    fun triggerLocalExpiry() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try { messageRepository.deleteExpiredMessages() } catch (_: Exception) {}
         }
     }
 
-    // â”€â”€ Retry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ Retry â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-    /**
-     * Re-queues all FAILED outgoing messages for the current conversation.
-     * Called automatically in [ChatScreen] when [ConnectionState.CONNECTED_RELAY] fires.
-     *
-     * Note: because we don't persist wire bytes, re-encryption requires a live session.
-     * This function marks FAILED â†’ SENDING so the UI shows them as pending rather than
-     * stuck in a permanent error state. Full re-encryption retry is Phase 3 work.
-     */
     fun retryFailedMessages() {
         val convId = conversationId ?: return
-        if (!relayWebSocketClient.isConnected()) return
+        if (!backgroundConnectionManager.isConnected(convId)) return
 
         viewModelScope.launch {
             val failedMessages = withContext(Dispatchers.IO) {
@@ -799,17 +612,34 @@ class ChatViewModel @Inject constructor(
 
     // â”€â”€ Cleanup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+    // ── Expiry scheduling ──────────────────────────────────────────────────────
+
+    /**
+     * Cancels any pending expiry job, then schedules a new one to fire at the nearest
+     * upcoming [Message.expiryDeadlineMs].  When it fires it calls [deleteExpiredMessages]
+     * which cleans up every message whose deadline has passed (including any that expired
+     * while the coroutine was sleeping).  The resulting Room emission re-triggers this
+     * function so the next nearest deadline is always scheduled.
+     */
+    private fun scheduleNextExpiry(messages: List<Message>) {
+        nextExpiryJob?.cancel()
+        val now = System.currentTimeMillis()
+        val nextDeadline = messages
+            .mapNotNull { it.expiryDeadlineMs }
+            .filter { it > now }
+            .minOrNull() ?: return
+        val delayMs = (nextDeadline - now).coerceAtLeast(0L)
+        nextExpiryJob = viewModelScope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(delayMs)
+            try { messageRepository.deleteExpiredMessages() } catch (_: Exception) {}
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        relayJob?.cancel()
-        relayWebSocketClient.disconnect()
-        ourEphemeralPair?.zeroizePrivate()
-        ourEphemeralPair = null
-        ourOfferPacket = null
-        conversationId?.let { convId ->
-            sendRatchets[convId]?.zeroizeAll()
-            recvRatchets[convId]?.zeroizeAll()
-        }
+        nextExpiryJob?.cancel()
+        // Unregister from BGM — BGM keeps the connection alive for background message delivery
+        conversationId?.let { backgroundConnectionManager.unregisterChatHandler(it) }
     }
 
     // ── Retry connection ───────────────────────────────────────────────────────
@@ -819,6 +649,7 @@ class ChatViewModel @Inject constructor(
         val convId = conversationId ?: return
         val contact = activeContact ?: return
         val identity = myIdentity ?: return
+        backgroundConnectionManager.forceReconnect(identity, contact)
         connectRelay(convId, identity, contact)
     }
 
@@ -838,7 +669,7 @@ class ChatViewModel @Inject constructor(
 data class SettingsUiState(
     val fingerprintHex: String = "",
     val screenshotBlockingEnabled: Boolean = true,
-    val defaultExpirySeconds: Int = 0,
+    val defaultExpirySeconds: Int = 1800,
     val appVersion: String = com.hacksecure.messenger.domain.model.AppVersion.NAME,
     val showRegenerateConfirm: Boolean = false,
     val serverRelayUrl: String = "",
@@ -858,6 +689,7 @@ class SettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         SettingsUiState(
             screenshotBlockingEnabled = prefs.getBoolean("screenshot_blocking", true),
+            defaultExpirySeconds = prefs.getInt("default_expiry_seconds", 1800),
             serverRelayUrl = serverConfig.relayBaseUrl
         )
     )
@@ -897,7 +729,10 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(screenshotBlockingEnabled = enabled) }
     }
 
-    fun setDefaultExpiry(seconds: Int) = _uiState.update { it.copy(defaultExpirySeconds = seconds) }
+    fun setDefaultExpiry(seconds: Int) {
+        prefs.edit().putInt("default_expiry_seconds", seconds).apply()
+        _uiState.update { it.copy(defaultExpirySeconds = seconds) }
+    }
 
     fun updateServerUrl(url: String) {
         serverConfig.relayBaseUrl = url

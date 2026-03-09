@@ -111,7 +111,10 @@ interface ContactDao {
 
 @Dao
 interface MessageDao {
-    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY counter ASC")
+    // rowid is SQLite's implicit auto-increment column — it reflects true insertion order
+    // and is a correct tie-breaker across senders (counter is per-sender and not comparable
+    // between Alice's ratchet and Bob's ratchet when timestamps collide).
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestampMs ASC, rowid ASC")
     fun getMessages(conversationId: String): kotlinx.coroutines.flow.Flow<List<MessageEntity>>
 
     @Query("SELECT * FROM messages WHERE id = :id")

@@ -236,7 +236,7 @@ public final class MessageDao_Impl implements MessageDao {
 
   @Override
   public Flow<List<MessageEntity>> getMessages(final String conversationId) {
-    final String _sql = "SELECT * FROM messages WHERE conversationId = ? ORDER BY counter ASC";
+    final String _sql = "SELECT * FROM messages WHERE conversationId = ? ORDER BY timestampMs ASC, rowid ASC";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
     int _argIndex = 1;
     _statement.bindString(_argIndex, conversationId);

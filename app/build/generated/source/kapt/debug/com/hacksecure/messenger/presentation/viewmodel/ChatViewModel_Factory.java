@@ -1,11 +1,10 @@
 package com.hacksecure.messenger.presentation.viewmodel;
 
+import android.content.Context;
+import com.hacksecure.messenger.data.remote.BackgroundConnectionManager;
 import com.hacksecure.messenger.data.remote.ServerConfig;
 import com.hacksecure.messenger.data.remote.api.RelayApi;
-import com.hacksecure.messenger.data.remote.websocket.RelayWebSocketClient;
-import com.hacksecure.messenger.domain.crypto.HandshakeManager;
 import com.hacksecure.messenger.domain.crypto.IdentityKeyManager;
-import com.hacksecure.messenger.domain.crypto.SessionKeyManager;
 import com.hacksecure.messenger.domain.repository.ContactRepository;
 import com.hacksecure.messenger.domain.repository.IdentityRepository;
 import com.hacksecure.messenger.domain.repository.MessageRepository;
@@ -17,7 +16,7 @@ import javax.annotation.processing.Generated;
 import javax.inject.Provider;
 
 @ScopeMetadata
-@QualifierMetadata
+@QualifierMetadata("dagger.hilt.android.qualifiers.ApplicationContext")
 @DaggerGenerated
 @Generated(
     value = "dagger.internal.codegen.ComponentProcessor",
@@ -39,56 +38,50 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
 
   private final Provider<IdentityKeyManager> identityKeyManagerProvider;
 
-  private final Provider<SessionKeyManager> sessionKeyManagerProvider;
-
-  private final Provider<HandshakeManager> handshakeManagerProvider;
-
-  private final Provider<RelayWebSocketClient> relayWebSocketClientProvider;
-
   private final Provider<RelayApi> relayApiProvider;
 
   private final Provider<ServerConfig> serverConfigProvider;
 
+  private final Provider<BackgroundConnectionManager> backgroundConnectionManagerProvider;
+
+  private final Provider<Context> appContextProvider;
+
   public ChatViewModel_Factory(Provider<MessageRepository> messageRepositoryProvider,
       Provider<ContactRepository> contactRepositoryProvider,
       Provider<IdentityRepository> identityRepositoryProvider,
-      Provider<IdentityKeyManager> identityKeyManagerProvider,
-      Provider<SessionKeyManager> sessionKeyManagerProvider,
-      Provider<HandshakeManager> handshakeManagerProvider,
-      Provider<RelayWebSocketClient> relayWebSocketClientProvider,
-      Provider<RelayApi> relayApiProvider, Provider<ServerConfig> serverConfigProvider) {
+      Provider<IdentityKeyManager> identityKeyManagerProvider, Provider<RelayApi> relayApiProvider,
+      Provider<ServerConfig> serverConfigProvider,
+      Provider<BackgroundConnectionManager> backgroundConnectionManagerProvider,
+      Provider<Context> appContextProvider) {
     this.messageRepositoryProvider = messageRepositoryProvider;
     this.contactRepositoryProvider = contactRepositoryProvider;
     this.identityRepositoryProvider = identityRepositoryProvider;
     this.identityKeyManagerProvider = identityKeyManagerProvider;
-    this.sessionKeyManagerProvider = sessionKeyManagerProvider;
-    this.handshakeManagerProvider = handshakeManagerProvider;
-    this.relayWebSocketClientProvider = relayWebSocketClientProvider;
     this.relayApiProvider = relayApiProvider;
     this.serverConfigProvider = serverConfigProvider;
+    this.backgroundConnectionManagerProvider = backgroundConnectionManagerProvider;
+    this.appContextProvider = appContextProvider;
   }
 
   @Override
   public ChatViewModel get() {
-    return newInstance(messageRepositoryProvider.get(), contactRepositoryProvider.get(), identityRepositoryProvider.get(), identityKeyManagerProvider.get(), sessionKeyManagerProvider.get(), handshakeManagerProvider.get(), relayWebSocketClientProvider.get(), relayApiProvider.get(), serverConfigProvider.get());
+    return newInstance(messageRepositoryProvider.get(), contactRepositoryProvider.get(), identityRepositoryProvider.get(), identityKeyManagerProvider.get(), relayApiProvider.get(), serverConfigProvider.get(), backgroundConnectionManagerProvider.get(), appContextProvider.get());
   }
 
   public static ChatViewModel_Factory create(Provider<MessageRepository> messageRepositoryProvider,
       Provider<ContactRepository> contactRepositoryProvider,
       Provider<IdentityRepository> identityRepositoryProvider,
-      Provider<IdentityKeyManager> identityKeyManagerProvider,
-      Provider<SessionKeyManager> sessionKeyManagerProvider,
-      Provider<HandshakeManager> handshakeManagerProvider,
-      Provider<RelayWebSocketClient> relayWebSocketClientProvider,
-      Provider<RelayApi> relayApiProvider, Provider<ServerConfig> serverConfigProvider) {
-    return new ChatViewModel_Factory(messageRepositoryProvider, contactRepositoryProvider, identityRepositoryProvider, identityKeyManagerProvider, sessionKeyManagerProvider, handshakeManagerProvider, relayWebSocketClientProvider, relayApiProvider, serverConfigProvider);
+      Provider<IdentityKeyManager> identityKeyManagerProvider, Provider<RelayApi> relayApiProvider,
+      Provider<ServerConfig> serverConfigProvider,
+      Provider<BackgroundConnectionManager> backgroundConnectionManagerProvider,
+      Provider<Context> appContextProvider) {
+    return new ChatViewModel_Factory(messageRepositoryProvider, contactRepositoryProvider, identityRepositoryProvider, identityKeyManagerProvider, relayApiProvider, serverConfigProvider, backgroundConnectionManagerProvider, appContextProvider);
   }
 
   public static ChatViewModel newInstance(MessageRepository messageRepository,
       ContactRepository contactRepository, IdentityRepository identityRepository,
-      IdentityKeyManager identityKeyManager, SessionKeyManager sessionKeyManager,
-      HandshakeManager handshakeManager, RelayWebSocketClient relayWebSocketClient,
-      RelayApi relayApi, ServerConfig serverConfig) {
-    return new ChatViewModel(messageRepository, contactRepository, identityRepository, identityKeyManager, sessionKeyManager, handshakeManager, relayWebSocketClient, relayApi, serverConfig);
+      IdentityKeyManager identityKeyManager, RelayApi relayApi, ServerConfig serverConfig,
+      BackgroundConnectionManager backgroundConnectionManager, Context appContext) {
+    return new ChatViewModel(messageRepository, contactRepository, identityRepository, identityKeyManager, relayApi, serverConfig, backgroundConnectionManager, appContext);
   }
 }

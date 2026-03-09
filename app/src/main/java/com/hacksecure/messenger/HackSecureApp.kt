@@ -13,6 +13,9 @@ class HackSecureApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var backgroundConnectionManager: com.hacksecure.messenger.data.remote.BackgroundConnectionManager
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -20,6 +23,6 @@ class HackSecureApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // Disable strict mode logging for crypto in release
+        backgroundConnectionManager.startAllConnections()
     }
 }

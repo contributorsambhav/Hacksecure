@@ -68,10 +68,21 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll to bottom on new messages
-    LaunchedEffect(state.messages.size) {
+    // Auto-scroll to bottom when a genuinely new last message arrives.
+    // Key on the last message's id so state updates (SENDING→SENT) and intermediate
+    // expiry deletions don't trigger a spurious scroll.
+    val lastMessageId = state.messages.lastOrNull()?.id
+    LaunchedEffect(lastMessageId) {
         if (state.messages.isNotEmpty()) {
-            listState.animateScrollToItem(state.messages.size - 1)
+            // The LazyColumn prepends 0 or 1 non-message header items:
+            //   • SessionStatusBanner  when sessionEstablished == true
+            //   • ConnectionTroubleshootCard when !sessionEstablished && DISCONNECTED/ERROR
+            // These are mutually exclusive, so headerCount is always 0 or 1.
+            val headerCount = if (state.sessionEstablished) 1
+                              else if (state.connectionState == ConnectionState.DISCONNECTED ||
+                                       state.connectionState == ConnectionState.ERROR) 1
+                              else 0
+            listState.animateScrollToItem(headerCount + state.messages.size - 1)
         }
     }
 
@@ -126,7 +137,7 @@ fun ChatScreen(
             }
 
             items(state.messages, key = { it.id }) { message ->
-                MessageBubble(message = message)
+                MessageBubble(message = message, onExpired = viewModel::triggerLocalExpiry)
             }
         }
     }
@@ -247,7 +258,7 @@ private fun SessionStatusBanner() {
 }
 
 @Composable
-private fun MessageBubble(message: Message) {
+private fun MessageBubble(message: Message, onExpired: () -> Unit = {}) {
     val isOutgoing = message.isOutgoing
 
     // Rejected/tampered message
@@ -337,6 +348,7 @@ private fun MessageBubble(message: Message) {
                             kotlinx.coroutines.delay(1000)
                             remaining.value = ((deadline - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
                         }
+                        onExpired()
                     }
                     Text(
                         text = "🔥 ${formatCountdown(remaining.value)}",
@@ -454,6 +466,7 @@ private fun ExpiryPickerSheet(
         30 to "30 seconds",
         60 to "1 minute",
         300 to "5 minutes",
+        1800 to "30 minutes",
         3600 to "1 hour",
         86400 to "24 hours"
     )
