@@ -2,6 +2,7 @@
 // Networking Layer — WebSocket relay client
 package com.hacksecure.messenger.data.remote.websocket
 
+import com.hacksecure.messenger.data.remote.ServerConfig
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -38,7 +39,7 @@ sealed class RelayEvent {
  */
 class RelayWebSocketClient(
     private val okHttpClient: OkHttpClient,
-    private val baseUrl: String
+    private val serverConfig: ServerConfig
 ) {
     companion object {
         private const val TAG = "RelayWebSocket"
@@ -107,14 +108,23 @@ class RelayWebSocketClient(
     }
 
     private fun connectInternal(conversationId: String, authToken: String) {
-        val url = "$baseUrl/ws?conv=$conversationId"
+        val url = "${serverConfig.relayBaseUrl}/ws?conv=$conversationId"
         val request = Request.Builder()
             .url(url)
             .addHeader("Authorization", "Bearer $authToken")
             .build()
 
+        // Capture the stale reference BEFORE overwriting — closed after new WS is created.
+        val staleWs = webSocket
+
         webSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {
+            // Guard: ignore callbacks from WebSockets that are no longer the active one.
+            // This prevents stale close/failure/message events from a previous connection
+            // triggering spurious reconnects or duplicate handshakes.
+            private fun WebSocket.isActive() = this === this@RelayWebSocketClient.webSocket
+
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                if (!webSocket.isActive()) return
                 Log.d(TAG, "WebSocket connected")
                 isConnected = true
                 reconnectAttempts = 0
@@ -122,6 +132,7 @@ class RelayWebSocketClient(
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                if (!webSocket.isActive()) return
                 try {
                     val data = bytes.toByteArray()
                     // Guard: minimum viable envelope is 2+1+2+1 = 6 bytes
@@ -153,16 +164,19 @@ class RelayWebSocketClient(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
+                if (!webSocket.isActive()) return
                 // We use binary frames only — ignore text frames
                 Log.w(TAG, "Unexpected text frame from relay, ignoring")
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                if (!webSocket.isActive()) return
                 webSocket.close(1000, null)
                 isConnected = false
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                if (!webSocket.isActive()) return
                 Log.d(TAG, "WebSocket closed: $code $reason")
                 isConnected = false
                 _events.tryEmit(RelayEvent.Disconnected)
@@ -170,12 +184,17 @@ class RelayWebSocketClient(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (!webSocket.isActive()) return
                 Log.e(TAG, "WebSocket failure", t)
                 isConnected = false
                 _events.tryEmit(RelayEvent.Error(t))
                 if (shouldReconnect) scheduleReconnect(conversationId, authToken)
             }
         })
+
+        // Close the stale WebSocket AFTER the new one is assigned, so `isActive()` checks
+        // from the stale WS's callbacks correctly detect it as inactive and bail out early.
+        staleWs?.close(1000, "Reconnecting")
     }
 
     private fun scheduleReconnect(conversationId: String, authToken: String) {

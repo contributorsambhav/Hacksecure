@@ -43,7 +43,8 @@ data class MessageEntity(
     val expiryMs: Long?,                    // null = no expiry
     val isDecryptable: Boolean = true,      // false after storage key deletion
     val isOutgoing: Boolean,
-    val messageType: String = "TEXT"        // TEXT | VOICE_NOTE (Phase 2)
+    val messageType: String = "TEXT",       // TEXT | VOICE_NOTE (Phase 2)
+    val messageState: String = "SENT"       // mirrors MessageState enum name
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -133,6 +134,14 @@ interface MessageDao {
 
     @Query("SELECT MAX(counter) FROM messages WHERE conversationId = :conversationId AND senderIdHex = :senderHex")
     suspend fun getMaxCounter(conversationId: String, senderHex: String): Long?
+
+    /** Persists the delivery state of a message (SENT, FAILED, DELIVERED, etc.). */
+    @Query("UPDATE messages SET messageState = :state WHERE id = :id")
+    suspend fun updateMessageState(id: String, state: String)
+
+    /** Returns outgoing messages in FAILED state — used by the retry mechanism. */
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND isOutgoing = 1 AND messageState = 'FAILED' ORDER BY counter ASC")
+    suspend fun getFailedMessages(conversationId: String): List<MessageEntity>
 }
 
 @Dao
@@ -169,6 +178,22 @@ interface LocalIdentityDao {
 // DATABASE
 // ══════════════════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════════════
+// MIGRATIONS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * v1 → v2: Added `messageState` column to track delivery status (SENT/FAILED/DELIVERED).
+ * All existing messages default to 'SENT' so historical data is preserved.
+ */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE messages ADD COLUMN messageState TEXT NOT NULL DEFAULT 'SENT'"
+        )
+    }
+}
+
 @Database(
     entities = [
         ContactEntity::class,
@@ -176,7 +201,7 @@ interface LocalIdentityDao {
         ConversationEntity::class,
         LocalIdentityEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -200,6 +225,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "hacksecure.db"
                 )
                     .openHelperFactory(factory)
+                    .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }

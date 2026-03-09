@@ -33,8 +33,9 @@ android {
         buildConfigField(
             "String",
             "SERVER_PUBLIC_KEY_HEX",
-            "\"bf6d828ba46445d0632b8a1810ff68b97a3aa2ed06146458c0592f8706333cb7\""
+            "\"bcedcb9616b2a1112c98e27f503870e4018c43bc1ae543ac49cfddc4616e4730\""
         )
+        // LAN IP for release / physical device builds
         buildConfigField("String", "RELAY_BASE_URL", "\"ws://10.155.36.9:8443\"")
         buildConfigField("String", "API_BASE_URL", "\"http://10.155.36.9:8443\"")
         buildConfigField("String", "APP_VERSION", "\"1.0.0\"")
@@ -45,11 +46,18 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Release must use wss:// and https:// — cleartext is blocked
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
         }
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            // Debug allows ws:// and http:// for local relay server
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            // 10.0.2.2 = Android emulator's alias for host localhost (Docker port 8443)
+            buildConfigField("String", "RELAY_BASE_URL", "\"ws://10.0.2.2:8443\"")
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8443\"")
         }
     }
     compileOptions {

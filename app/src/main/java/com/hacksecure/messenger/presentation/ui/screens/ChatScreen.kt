@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -34,6 +35,13 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var showExpiryPicker by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Register ViewModel as lifecycle observer for background/foreground reconnect
+    DisposableEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.addObserver(viewModel)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(viewModel) }
+    }
 
     LaunchedEffect(contactId) {
         viewModel.initConversation(contactId)
@@ -47,8 +55,16 @@ fun ChatScreen(
                     "⚠ Message verification failed — possible tampering detected."
                 )
                 is ChatEvent.SessionSecured -> snackbarHostState.showSnackbar("🔒 Session secured")
+                is ChatEvent.RetrySucceeded -> snackbarHostState.showSnackbar("✅ Messages re-queued")
                 else -> {}
             }
+        }
+    }
+
+    // Retry failed messages automatically when relay reconnects
+    LaunchedEffect(state.connectionState) {
+        if (state.connectionState == ConnectionState.CONNECTED_RELAY) {
+            viewModel.retryFailedMessages()
         }
     }
 
@@ -89,6 +105,19 @@ fun ChatScreen(
             contentPadding = PaddingValues(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            // Disconnection troubleshoot card
+            if (!state.sessionEstablished &&
+                (state.connectionState == ConnectionState.DISCONNECTED ||
+                 state.connectionState == ConnectionState.ERROR)) {
+                item {
+                    ConnectionTroubleshootCard(
+                        connectionState = state.connectionState,
+                        serverUrl = state.serverRelayUrl,
+                        onRetry = viewModel::retryConnection
+                    )
+                }
+            }
+
             // Session status header
             if (state.sessionEstablished) {
                 item {
@@ -334,10 +363,14 @@ private fun MessageBubble(message: Message) {
                         val icon = when (message.state) {
                             MessageState.SENT -> Icons.Filled.Check
                             MessageState.DELIVERED -> Icons.Filled.DoneAll
+                            MessageState.FAILED -> Icons.Filled.ErrorOutline
                             else -> Icons.Filled.Schedule
                         }
-                        Icon(icon, null, modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f))
+                        val tintColor = if (message.state == MessageState.FAILED)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                        Icon(icon, null, modifier = Modifier.size(12.dp), tint = tintColor)
                     }
                 }
             }
@@ -453,6 +486,54 @@ private fun ExpiryPickerSheet(
                     modifier = Modifier.clickable { onSelect(seconds) }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionTroubleshootCard(
+    connectionState: ConnectionState,
+    serverUrl: String,
+    onRetry: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(
+                    Icons.Filled.WifiOff, null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    if (connectionState == ConnectionState.ERROR) "Connection error" else "Not connected",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+            if (serverUrl.isNotEmpty()) {
+                Text(
+                    "Server: $serverUrl",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+            Text(
+                "Make sure both devices are on the same network and the server URL is correct in Settings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) { Text("Retry Connection") }
         }
     }
 }

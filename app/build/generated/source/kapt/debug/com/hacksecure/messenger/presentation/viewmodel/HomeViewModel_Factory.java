@@ -1,6 +1,7 @@
 package com.hacksecure.messenger.presentation.viewmodel;
 
 import com.hacksecure.messenger.domain.repository.ContactRepository;
+import com.hacksecure.messenger.domain.repository.IdentityRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
 import dagger.internal.QualifierMetadata;
@@ -25,21 +26,26 @@ import javax.inject.Provider;
 public final class HomeViewModel_Factory implements Factory<HomeViewModel> {
   private final Provider<ContactRepository> contactRepositoryProvider;
 
-  public HomeViewModel_Factory(Provider<ContactRepository> contactRepositoryProvider) {
+  private final Provider<IdentityRepository> identityRepositoryProvider;
+
+  public HomeViewModel_Factory(Provider<ContactRepository> contactRepositoryProvider,
+      Provider<IdentityRepository> identityRepositoryProvider) {
     this.contactRepositoryProvider = contactRepositoryProvider;
+    this.identityRepositoryProvider = identityRepositoryProvider;
   }
 
   @Override
   public HomeViewModel get() {
-    return newInstance(contactRepositoryProvider.get());
+    return newInstance(contactRepositoryProvider.get(), identityRepositoryProvider.get());
   }
 
-  public static HomeViewModel_Factory create(
-      Provider<ContactRepository> contactRepositoryProvider) {
-    return new HomeViewModel_Factory(contactRepositoryProvider);
+  public static HomeViewModel_Factory create(Provider<ContactRepository> contactRepositoryProvider,
+      Provider<IdentityRepository> identityRepositoryProvider) {
+    return new HomeViewModel_Factory(contactRepositoryProvider, identityRepositoryProvider);
   }
 
-  public static HomeViewModel newInstance(ContactRepository contactRepository) {
-    return new HomeViewModel(contactRepository);
+  public static HomeViewModel newInstance(ContactRepository contactRepository,
+      IdentityRepository identityRepository) {
+    return new HomeViewModel(contactRepository, identityRepository);
   }
 }

@@ -1,5 +1,6 @@
 package com.hacksecure.messenger.data.remote.websocket;
 
+import com.hacksecure.messenger.data.remote.ServerConfig;
 import kotlinx.coroutines.channels.BufferOverflow;
 import kotlinx.coroutines.flow.SharedFlow;
 import okio.ByteString;

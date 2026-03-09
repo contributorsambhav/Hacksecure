@@ -89,7 +89,6 @@
 52    <!-- <uses-permission android:name="android.permission.RECORD_AUDIO"/> -->
 53    <!-- <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/> -->
 54    <application
-54-->C:\Users\arung\OneDrive\Desktop\HackSecureMessenger_v1.0.2_fixed\HackSecureMessenger\app\src\main\AndroidManifest.xml:24:5-66:19
 55        android:name="com.hacksecure.messenger.HackSecureApp"
 55-->C:\Users\arung\OneDrive\Desktop\HackSecureMessenger_v1.0.2_fixed\HackSecureMessenger\app\src\main\AndroidManifest.xml:25:9-38
 56        android:allowBackup="false"
@@ -110,8 +109,8 @@
 64-->C:\Users\arung\OneDrive\Desktop\HackSecureMessenger_v1.0.2_fixed\HackSecureMessenger\app\src\main\AndroidManifest.xml:30:9-35
 65        android:theme="@style/Theme.HackSecure"
 65-->C:\Users\arung\OneDrive\Desktop\HackSecureMessenger_v1.0.2_fixed\HackSecureMessenger\app\src\main\AndroidManifest.xml:31:9-48
-66        android:usesCleartextTraffic="false" >
-66-->C:\Users\arung\OneDrive\Desktop\HackSecureMessenger_v1.0.2_fixed\HackSecureMessenger\app\src\main\AndroidManifest.xml:33:9-45
+66        android:usesCleartextTraffic="true" >
+66-->C:\Users\arung\OneDrive\Desktop\HackSecureMessenger_v1.0.2_fixed\HackSecureMessenger\app\src\main\AndroidManifest.xml:33:9-63
 67        <activity
 67-->C:\Users\arung\OneDrive\Desktop\HackSecureMessenger_v1.0.2_fixed\HackSecureMessenger\app\src\main\AndroidManifest.xml:35:9-52:20
 68            android:name="com.hacksecure.messenger.MainActivity"

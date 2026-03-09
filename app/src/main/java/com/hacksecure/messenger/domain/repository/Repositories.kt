@@ -23,7 +23,10 @@ interface MessageRepository {
     fun getMessages(conversationId: String): Flow<List<Message>>
     suspend fun saveMessage(message: Message, plaintextBytes: ByteArray)
     suspend fun getMessage(id: String): Message?
+    suspend fun updateMessageState(messageId: String, state: MessageState)
     suspend fun deleteExpiredMessages()
     suspend fun deleteConversationMessages(conversationId: String)
     suspend fun getMaxCounter(conversationId: String, senderHex: String): Long
+    /** Returns all outgoing messages in FAILED state for a given conversation. */
+    suspend fun getFailedMessages(conversationId: String): List<Message>
 }

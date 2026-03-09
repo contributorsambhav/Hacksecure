@@ -123,6 +123,7 @@ enum class MessageState {
     SENDING,
     SENT,
     DELIVERED,
+    FAILED,         // network send failed — eligible for retry
     REJECTED,       // signature/AEAD/timestamp/counter check failed
     EXPIRED
 }

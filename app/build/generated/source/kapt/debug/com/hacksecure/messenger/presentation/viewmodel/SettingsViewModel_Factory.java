@@ -1,6 +1,7 @@
 package com.hacksecure.messenger.presentation.viewmodel;
 
 import android.content.Context;
+import com.hacksecure.messenger.data.remote.ServerConfig;
 import com.hacksecure.messenger.domain.repository.IdentityRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -28,25 +29,28 @@ public final class SettingsViewModel_Factory implements Factory<SettingsViewMode
 
   private final Provider<Context> appContextProvider;
 
+  private final Provider<ServerConfig> serverConfigProvider;
+
   public SettingsViewModel_Factory(Provider<IdentityRepository> identityRepositoryProvider,
-      Provider<Context> appContextProvider) {
+      Provider<Context> appContextProvider, Provider<ServerConfig> serverConfigProvider) {
     this.identityRepositoryProvider = identityRepositoryProvider;
     this.appContextProvider = appContextProvider;
+    this.serverConfigProvider = serverConfigProvider;
   }
 
   @Override
   public SettingsViewModel get() {
-    return newInstance(identityRepositoryProvider.get(), appContextProvider.get());
+    return newInstance(identityRepositoryProvider.get(), appContextProvider.get(), serverConfigProvider.get());
   }
 
   public static SettingsViewModel_Factory create(
-      Provider<IdentityRepository> identityRepositoryProvider,
-      Provider<Context> appContextProvider) {
-    return new SettingsViewModel_Factory(identityRepositoryProvider, appContextProvider);
+      Provider<IdentityRepository> identityRepositoryProvider, Provider<Context> appContextProvider,
+      Provider<ServerConfig> serverConfigProvider) {
+    return new SettingsViewModel_Factory(identityRepositoryProvider, appContextProvider, serverConfigProvider);
   }
 
   public static SettingsViewModel newInstance(IdentityRepository identityRepository,
-      Context appContext) {
-    return new SettingsViewModel(identityRepository, appContext);
+      Context appContext, ServerConfig serverConfig) {
+    return new SettingsViewModel(identityRepository, appContext, serverConfig);
   }
 }

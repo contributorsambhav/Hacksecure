@@ -138,7 +138,8 @@ class MessageRepositoryImpl @Inject constructor(
             expiryMs = message.expiryDeadlineMs,
             isDecryptable = true,
             isOutgoing = message.isOutgoing,
-            messageType = message.messageType.name
+            messageType = message.messageType.name,
+            messageState = message.state.name
         )
         dao.insertMessage(entity)
     }
@@ -173,6 +174,18 @@ class MessageRepositoryImpl @Inject constructor(
     override suspend fun getMaxCounter(conversationId: String, senderHex: String): Long =
         dao.getMaxCounter(conversationId, senderHex) ?: 0L
 
+    override suspend fun updateMessageState(messageId: String, state: MessageState) =
+        dao.updateMessageState(messageId, state.name)
+
+    override suspend fun getFailedMessages(conversationId: String): List<Message> =
+        dao.getFailedMessages(conversationId).map { entity ->
+            val plaintext = if (entity.isDecryptable) {
+                try { keystoreManager.decryptMessageFromStorage(entity.id, entity.ciphertextBlob) }
+                catch (_: Exception) { null }
+            } else null
+            entity.toDomain(plaintext?.toString(Charsets.UTF_8))
+        }
+
     private fun MessageEntity.toDomain(plaintext: String?) = Message(
         id = id,
         conversationId = conversationId,
@@ -183,7 +196,8 @@ class MessageRepositoryImpl @Inject constructor(
         expirySeconds = 0,
         expiryDeadlineMs = expiryMs,
         isOutgoing = isOutgoing,
-        state = if (isDecryptable) MessageState.DELIVERED else MessageState.EXPIRED,
+        state = if (!isDecryptable) MessageState.EXPIRED
+                else try { MessageState.valueOf(messageState) } catch (_: Exception) { MessageState.SENT },
         messageType = try { MessageType.valueOf(messageType) } catch (_: Exception) { MessageType.TEXT }
     )
 

@@ -1,5 +1,6 @@
 package com.hacksecure.messenger.di;
 
+import com.hacksecure.messenger.data.remote.ServerConfig;
 import com.hacksecure.messenger.data.remote.websocket.RelayWebSocketClient;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -27,21 +28,26 @@ import okhttp3.OkHttpClient;
 public final class AppModule_ProvideRelayWebSocketClientFactory implements Factory<RelayWebSocketClient> {
   private final Provider<OkHttpClient> okHttpClientProvider;
 
-  public AppModule_ProvideRelayWebSocketClientFactory(Provider<OkHttpClient> okHttpClientProvider) {
+  private final Provider<ServerConfig> serverConfigProvider;
+
+  public AppModule_ProvideRelayWebSocketClientFactory(Provider<OkHttpClient> okHttpClientProvider,
+      Provider<ServerConfig> serverConfigProvider) {
     this.okHttpClientProvider = okHttpClientProvider;
+    this.serverConfigProvider = serverConfigProvider;
   }
 
   @Override
   public RelayWebSocketClient get() {
-    return provideRelayWebSocketClient(okHttpClientProvider.get());
+    return provideRelayWebSocketClient(okHttpClientProvider.get(), serverConfigProvider.get());
   }
 
   public static AppModule_ProvideRelayWebSocketClientFactory create(
-      Provider<OkHttpClient> okHttpClientProvider) {
-    return new AppModule_ProvideRelayWebSocketClientFactory(okHttpClientProvider);
+      Provider<OkHttpClient> okHttpClientProvider, Provider<ServerConfig> serverConfigProvider) {
+    return new AppModule_ProvideRelayWebSocketClientFactory(okHttpClientProvider, serverConfigProvider);
   }
 
-  public static RelayWebSocketClient provideRelayWebSocketClient(OkHttpClient okHttpClient) {
-    return Preconditions.checkNotNullFromProvides(AppModule.INSTANCE.provideRelayWebSocketClient(okHttpClient));
+  public static RelayWebSocketClient provideRelayWebSocketClient(OkHttpClient okHttpClient,
+      ServerConfig serverConfig) {
+    return Preconditions.checkNotNullFromProvides(AppModule.INSTANCE.provideRelayWebSocketClient(okHttpClient, serverConfig));
   }
 }

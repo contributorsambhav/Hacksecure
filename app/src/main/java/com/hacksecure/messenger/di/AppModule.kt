@@ -5,6 +5,7 @@ import android.content.Context
 import com.hacksecure.messenger.BuildConfig
 import com.hacksecure.messenger.data.local.db.*
 import com.hacksecure.messenger.data.local.keystore.KeystoreManager
+import com.hacksecure.messenger.data.remote.ServerConfig
 import com.hacksecure.messenger.data.remote.api.RelayApi
 import com.hacksecure.messenger.data.remote.websocket.RelayWebSocketClient
 import com.hacksecure.messenger.data.repository.*
@@ -84,15 +85,19 @@ object AppModule {
     @Provides @Singleton
     fun provideRelayApi(okHttpClient: OkHttpClient): RelayApi =
         Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
+            // Placeholder base URL — actual URL is provided per-call via @Url parameter
+            // so the server address can be changed at runtime without rebuilding.
+            .baseUrl("http://localhost/")
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(RelayApi::class.java)
 
     @Provides @Singleton
-    fun provideRelayWebSocketClient(okHttpClient: OkHttpClient): RelayWebSocketClient =
-        RelayWebSocketClient(okHttpClient, BuildConfig.RELAY_BASE_URL)
+    fun provideRelayWebSocketClient(
+        okHttpClient: OkHttpClient,
+        serverConfig: ServerConfig
+    ): RelayWebSocketClient = RelayWebSocketClient(okHttpClient, serverConfig)
 
     // ── Repositories ────────────────────────────────────────────────────────
 

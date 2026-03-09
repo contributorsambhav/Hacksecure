@@ -30,7 +30,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.HackSecure"
         android:hardwareAccelerated="true"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="${usesCleartextTraffic}">
 
         <activity
             android:name=".MainActivity"

@@ -63,7 +63,7 @@
         android:label="HackSecure"
         android:supportsRtl="true"
         android:theme="@style/Theme.HackSecure"
-        android:usesCleartextTraffic="false" >
+        android:usesCleartextTraffic="true" >
         <activity
             android:name="com.hacksecure.messenger.MainActivity"
             android:exported="true"

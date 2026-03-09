@@ -4,6 +4,7 @@ import android.content.Context;
 import com.hacksecure.messenger.BuildConfig;
 import com.hacksecure.messenger.data.local.db.*;
 import com.hacksecure.messenger.data.local.keystore.KeystoreManager;
+import com.hacksecure.messenger.data.remote.ServerConfig;
 import com.hacksecure.messenger.data.remote.api.RelayApi;
 import com.hacksecure.messenger.data.remote.websocket.RelayWebSocketClient;
 import com.hacksecure.messenger.data.repository.*;

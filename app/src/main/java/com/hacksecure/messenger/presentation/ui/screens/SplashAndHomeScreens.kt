@@ -270,6 +270,7 @@ fun QrDisplayScreen(
     val state by viewModel.uiState.collectAsState()
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
+    var codeCopied by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -341,6 +342,18 @@ fun QrDisplayScreen(
                     Icon(Icons.Filled.ContentCopy, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(if (copied) "Copied!" else "Copy Fingerprint")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(state.qrPayload))
+                        codeCopied = true
+                    },
+                    enabled = state.qrPayload.isNotEmpty()
+                ) {
+                    Icon(Icons.Filled.Share, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (codeCopied) "Code Copied!" else "Copy Contact Code")
                 }
 
                 Text(

@@ -1,7 +1,15 @@
 package com.hacksecure.messenger.presentation.viewmodel;
 
 import android.util.Base64;
+import androidx.lifecycle.DefaultLifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.ViewModel;
+import com.hacksecure.messenger.data.remote.api.PresenceRequest;
+import com.hacksecure.messenger.data.remote.api.RelayApi;
+import com.hacksecure.messenger.data.remote.ServerConfig;
+import com.hacksecure.messenger.data.remote.api.TicketRequest;
+import com.hacksecure.messenger.data.remote.websocket.RelayEvent;
+import com.hacksecure.messenger.data.remote.websocket.RelayWebSocketClient;
 import com.hacksecure.messenger.domain.crypto.*;
 import com.hacksecure.messenger.domain.model.*;
 import com.hacksecure.messenger.domain.repository.*;
@@ -11,7 +19,7 @@ import kotlinx.coroutines.flow.*;
 import java.util.UUID;
 import javax.inject.Inject;
 
-@kotlin.Metadata(mv = {1, 9, 0}, k = 1, xi = 48, d1 = {"\u0000\u001e\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\b6\u0018\u00002\u00020\u0001:\u0004\u0003\u0004\u0005\u0006B\u0007\b\u0004\u00a2\u0006\u0002\u0010\u0002\u0082\u0001\u0004\u0007\b\t\n\u00a8\u0006\u000b"}, d2 = {"Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent;", "", "()V", "MessageRejected", "SessionSecured", "ShowError", "Snackbar", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$MessageRejected;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$SessionSecured;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$ShowError;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$Snackbar;", "app_debug"})
+@kotlin.Metadata(mv = {1, 9, 0}, k = 1, xi = 48, d1 = {"\u0000\"\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0006\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\b6\u0018\u00002\u00020\u0001:\u0005\u0003\u0004\u0005\u0006\u0007B\u0007\b\u0004\u00a2\u0006\u0002\u0010\u0002\u0082\u0001\u0005\b\t\n\u000b\f\u00a8\u0006\r"}, d2 = {"Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent;", "", "()V", "MessageRejected", "RetrySucceeded", "SessionSecured", "ShowError", "Snackbar", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$MessageRejected;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$RetrySucceeded;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$SessionSecured;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$ShowError;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$Snackbar;", "app_debug"})
 public abstract class ChatEvent {
     
     private ChatEvent() {
@@ -58,6 +66,18 @@ public abstract class ChatEvent {
         @org.jetbrains.annotations.NotNull()
         public java.lang.String toString() {
             return null;
+        }
+    }
+    
+    /**
+     * Emitted when re-queuing previously-FAILED messages on reconnect.
+     */
+    @kotlin.Metadata(mv = {1, 9, 0}, k = 1, xi = 48, d1 = {"\u0000\f\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u00c6\u0002\u0018\u00002\u00020\u0001B\u0007\b\u0002\u00a2\u0006\u0002\u0010\u0002\u00a8\u0006\u0003"}, d2 = {"Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent$RetrySucceeded;", "Lcom/hacksecure/messenger/presentation/viewmodel/ChatEvent;", "()V", "app_debug"})
+    public static final class RetrySucceeded extends com.hacksecure.messenger.presentation.viewmodel.ChatEvent {
+        @org.jetbrains.annotations.NotNull()
+        public static final com.hacksecure.messenger.presentation.viewmodel.ChatEvent.RetrySucceeded INSTANCE = null;
+        
+        private RetrySucceeded() {
         }
     }
     

@@ -76,17 +76,59 @@ fun QrScanScreen(
         }
     }
 
+    var showManualEntry by remember { mutableStateOf(false) }
+    var manualCode by remember { mutableStateOf("") }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Scan QR Code") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, "Back") } }
+                title = { Text(if (showManualEntry) "Enter Code" else "Scan QR Code") },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, "Back") } },
+                actions = {
+                    IconButton(onClick = { showManualEntry = !showManualEntry }) {
+                        Icon(
+                            if (showManualEntry) Icons.Filled.CameraAlt else Icons.Filled.Keyboard,
+                            contentDescription = if (showManualEntry) "Switch to camera scan" else "Enter code manually"
+                        )
+                    }
+                }
             )
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (hasCameraPermission) {
+            if (showManualEntry) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text("Enter contact code manually", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Paste the hacksecure:// code shared by your contact.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = manualCode,
+                        onValueChange = { manualCode = it },
+                        label = { Text("Contact code") },
+                        placeholder = { Text("hacksecure://id/v1/...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 6
+                    )
+                    Button(
+                        onClick = {
+                            val code = manualCode.trim()
+                            if (code.isNotEmpty()) viewModel.processQrResult(code)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = manualCode.isNotBlank()
+                    ) { Text("Add Contact") }
+                }
+            } else if (hasCameraPermission) {
                 CameraPreview(
                     modifier = Modifier.fillMaxSize(),
                     onQrCodeDetected = { raw -> viewModel.processQrResult(raw) }
@@ -430,6 +472,55 @@ fun SettingsScreen(
                         onCheckedChange = viewModel::setScreenshotBlocking
                     )
                 }
+            )
+
+            // ── Connection ───────────────────────────────────────────────────
+            SettingsSectionHeader("Connection")
+
+            var serverUrlInput by remember(state.serverRelayUrl) { mutableStateOf(state.serverRelayUrl) }
+
+            ListItem(
+                headlineContent = {
+                    OutlinedTextField(
+                        value = serverUrlInput,
+                        onValueChange = { serverUrlInput = it },
+                        label = { Text("Relay server URL") },
+                        placeholder = { Text("ws://192.168.1.100:8443") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                leadingContent = { Icon(Icons.Filled.Dns, null) }
+            )
+
+            ListItem(
+                headlineContent = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.updateServerUrl(serverUrlInput.trim()) },
+                            enabled = serverUrlInput.isNotBlank()
+                        ) { Text("Save") }
+                        OutlinedButton(
+                            onClick = { viewModel.pingServer() },
+                            enabled = !state.isPinging
+                        ) {
+                            if (state.isPinging) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text("Test Connection")
+                        }
+                    }
+                },
+                supportingContent = if (state.pingStatus.isNotEmpty()) ({
+                    Text(
+                        state.pingStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.pingStatus.startsWith("Cannot")) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.primary
+                    )
+                }) else null,
+                leadingContent = { Icon(Icons.Filled.NetworkCheck, null) }
             )
 
             // ── About ────────────────────────────────────────────────────────
