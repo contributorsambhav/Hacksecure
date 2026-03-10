@@ -2,6 +2,7 @@ package com.hacksecure.messenger.presentation.viewmodel;
 
 import com.hacksecure.messenger.domain.repository.ContactRepository;
 import com.hacksecure.messenger.domain.repository.IdentityRepository;
+import com.hacksecure.messenger.domain.repository.MessageRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
 import dagger.internal.QualifierMetadata;
@@ -28,24 +29,29 @@ public final class HomeViewModel_Factory implements Factory<HomeViewModel> {
 
   private final Provider<IdentityRepository> identityRepositoryProvider;
 
+  private final Provider<MessageRepository> messageRepositoryProvider;
+
   public HomeViewModel_Factory(Provider<ContactRepository> contactRepositoryProvider,
-      Provider<IdentityRepository> identityRepositoryProvider) {
+      Provider<IdentityRepository> identityRepositoryProvider,
+      Provider<MessageRepository> messageRepositoryProvider) {
     this.contactRepositoryProvider = contactRepositoryProvider;
     this.identityRepositoryProvider = identityRepositoryProvider;
+    this.messageRepositoryProvider = messageRepositoryProvider;
   }
 
   @Override
   public HomeViewModel get() {
-    return newInstance(contactRepositoryProvider.get(), identityRepositoryProvider.get());
+    return newInstance(contactRepositoryProvider.get(), identityRepositoryProvider.get(), messageRepositoryProvider.get());
   }
 
   public static HomeViewModel_Factory create(Provider<ContactRepository> contactRepositoryProvider,
-      Provider<IdentityRepository> identityRepositoryProvider) {
-    return new HomeViewModel_Factory(contactRepositoryProvider, identityRepositoryProvider);
+      Provider<IdentityRepository> identityRepositoryProvider,
+      Provider<MessageRepository> messageRepositoryProvider) {
+    return new HomeViewModel_Factory(contactRepositoryProvider, identityRepositoryProvider, messageRepositoryProvider);
   }
 
   public static HomeViewModel newInstance(ContactRepository contactRepository,
-      IdentityRepository identityRepository) {
-    return new HomeViewModel(contactRepository, identityRepository);
+      IdentityRepository identityRepository, MessageRepository messageRepository) {
+    return new HomeViewModel(contactRepository, identityRepository, messageRepository);
   }
 }

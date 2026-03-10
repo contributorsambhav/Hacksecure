@@ -120,6 +120,9 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getMessage(id: String): MessageEntity?
 
+    @Query("SELECT * FROM messages WHERE conversationId = :convId AND senderIdHex = :senderHex AND counter = :counter LIMIT 1")
+    suspend fun getMessageByCounterAndSender(convId: String, senderHex: String, counter: Long): MessageEntity?
+
     @Query("SELECT * FROM messages WHERE expiryMs IS NOT NULL AND expiryMs <= :nowMs AND isDecryptable = 1")
     suspend fun getExpiredMessages(nowMs: Long): List<MessageEntity>
 

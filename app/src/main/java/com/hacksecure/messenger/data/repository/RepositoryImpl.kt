@@ -168,6 +168,18 @@ class MessageRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteMessage(messageId: String) {
+        val entity = dao.getMessage(messageId) ?: return
+        keystoreManager.deleteKeyByAlias(entity.storageKeyAlias)
+        dao.deleteMessage(entity.id)
+    }
+
+    override suspend fun deleteMessageByCounterAndSender(convId: String, senderHex: String, counter: Long) {
+        val entity = dao.getMessageByCounterAndSender(convId, senderHex, counter) ?: return
+        keystoreManager.deleteKeyByAlias(entity.storageKeyAlias)
+        dao.deleteMessage(entity.id)
+    }
+
     override suspend fun deleteConversationMessages(conversationId: String) =
         dao.deleteConversationMessages(conversationId)
 

@@ -60,7 +60,9 @@
         android:extractNativeLibs="false"
         android:fullBackupContent="false"
         android:hardwareAccelerated="true"
-        android:label="HackSecure"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Hacksecure"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.HackSecure"
         android:usesCleartextTraffic="true" >

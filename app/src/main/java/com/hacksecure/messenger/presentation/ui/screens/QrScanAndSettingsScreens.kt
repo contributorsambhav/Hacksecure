@@ -285,7 +285,7 @@ fun ContactConfirmScreen(
         AlertDialog(
             onDismissRequest = { showKeyChangeDialog = null },
             icon = { Icon(Icons.Filled.Warning, null, tint = WarningAmber) },
-            title = { Text("⚠️ Key Change Detected") },
+            title = { Text("Key Change Detected") },
             text = {
                 Text("This contact's identity key has changed. This could indicate a device change or a security risk. Only proceed if you have verified this out-of-band.")
             },
@@ -407,7 +407,7 @@ fun SettingsScreen(
             icon = { Icon(Icons.Filled.Warning, null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("Regenerate Identity?") },
             text = {
-                Text("This will create a new identity key, making you unrecognisable to all existing contacts. They will see a key change warning. This cannot be undone.")
+                Text("This will create a new identity key, making you unrecognizable to all existing contacts. They will see a key change warning. This cannot be undone.")
             },
             confirmButton = {
                 Button(
@@ -474,42 +474,20 @@ fun SettingsScreen(
                 }
             )
 
-            // ── Connection ───────────────────────────────────────────────────
+            // Connection
             SettingsSectionHeader("Connection")
 
-            var serverUrlInput by remember(state.serverRelayUrl) { mutableStateOf(state.serverRelayUrl) }
-
             ListItem(
                 headlineContent = {
-                    OutlinedTextField(
-                        value = serverUrlInput,
-                        onValueChange = { serverUrlInput = it },
-                        label = { Text("Relay server URL") },
-                        placeholder = { Text("ws://192.168.1.100:8443") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                leadingContent = { Icon(Icons.Filled.Dns, null) }
-            )
-
-            ListItem(
-                headlineContent = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { viewModel.updateServerUrl(serverUrlInput.trim()) },
-                            enabled = serverUrlInput.isNotBlank()
-                        ) { Text("Save") }
-                        OutlinedButton(
-                            onClick = { viewModel.pingServer() },
-                            enabled = !state.isPinging
-                        ) {
-                            if (state.isPinging) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(6.dp))
-                            }
-                            Text("Test Connection")
+                    OutlinedButton(
+                        onClick = { viewModel.pingServer() },
+                        enabled = !state.isPinging
+                    ) {
+                        if (state.isPinging) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(6.dp))
                         }
+                        Text("Test Connection")
                     }
                 },
                 supportingContent = if (state.pingStatus.isNotEmpty()) ({
@@ -523,29 +501,13 @@ fun SettingsScreen(
                 leadingContent = { Icon(Icons.Filled.NetworkCheck, null) }
             )
 
-            // ── About ────────────────────────────────────────────────────────
+            // About
             SettingsSectionHeader("About")
 
             ListItem(
                 headlineContent = { Text("Version") },
                 supportingContent = { Text("${AppVersion.NAME} (${AppVersion.CODE})") },
                 leadingContent = { Icon(Icons.Filled.Info, null) }
-            )
-
-            ListItem(
-                headlineContent = { Text("Cryptographic Stack") },
-                supportingContent = {
-                    Text("Ed25519 identity · X25519 DH · ChaCha20-Poly1305 AEAD · SHA-256 ratchet · SQLCipher storage")
-                },
-                leadingContent = { Icon(Icons.Filled.Security, null) }
-            )
-
-            ListItem(
-                headlineContent = { Text("Feature Roadmap") },
-                supportingContent = {
-                    Text("✅ Messaging  |  🔜 Voice Notes (v1.1)  |  🔜 Voice Calls (v2.0)")
-                },
-                leadingContent = { Icon(Icons.Filled.Explore, null) }
             )
 
             Spacer(Modifier.height(24.dp))

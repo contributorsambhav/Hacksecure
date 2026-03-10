@@ -14,6 +14,9 @@ android {
     namespace = "com.hacksecure.messenger"
     compileSdk = 34
 
+    // APK output name
+    setProperty("archivesBaseName", "Hacksecure")
+
     defaultConfig {
         applicationId = "com.hacksecure.messenger"
         minSdk = 26

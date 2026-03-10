@@ -56,7 +56,7 @@ fun SplashScreen(onReady: () -> Unit) {
                 tint = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = "HackSecure Messenger",
+                text = "Hacksecure",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -103,6 +103,28 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    var pendingDeleteItem by remember { mutableStateOf<ConversationUiItem?>(null) }
+
+    pendingDeleteItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteItem = null },
+            icon = { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Delete Chat") },
+            text = { Text("Delete your conversation with ${item.contact.displayName}? This cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteConversation(item.contact.id)
+                        pendingDeleteItem = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteItem = null }) { Text("Cancel") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -149,7 +171,8 @@ fun HomeScreen(
                 items(state.conversations, key = { it.conversationId }) { item ->
                     ConversationRow(
                         item = item,
-                        onClick = { onNavigateToChat(item.contact.id) }
+                        onClick = { onNavigateToChat(item.contact.id) },
+                        onDelete = { pendingDeleteItem = item }
                     )
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
@@ -186,12 +209,13 @@ private fun EmptyHomeState(modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationRow(item: ConversationUiItem, onClick: () -> Unit) {
+private fun ConversationRow(item: ConversationUiItem, onClick: () -> Unit, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onDelete)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -236,7 +260,7 @@ private fun ConversationRow(item: ConversationUiItem, onClick: () -> Unit) {
                 )
             }
             Text(
-                text = "🔒 Encrypted message",
+                text = "End-to-End Encrypted",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

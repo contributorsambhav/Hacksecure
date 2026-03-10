@@ -52,10 +52,10 @@ fun ChatScreen(
             when (event) {
                 is ChatEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
                 is ChatEvent.MessageRejected -> snackbarHostState.showSnackbar(
-                    "⚠ Message verification failed — possible tampering detected."
+                    "Message verification failed. Possible tampering detected."
                 )
-                is ChatEvent.SessionSecured -> snackbarHostState.showSnackbar("🔒 Session secured")
-                is ChatEvent.RetrySucceeded -> snackbarHostState.showSnackbar("✅ Messages re-queued")
+                is ChatEvent.SessionSecured -> snackbarHostState.showSnackbar("Session secured")
+                is ChatEvent.RetrySucceeded -> snackbarHostState.showSnackbar("Messages re-queued")
                 else -> {}
             }
         }
@@ -123,7 +123,6 @@ fun ChatScreen(
                 item {
                     ConnectionTroubleshootCard(
                         connectionState = state.connectionState,
-                        serverUrl = state.serverRelayUrl,
                         onRetry = viewModel::retryConnection
                     )
                 }
@@ -137,7 +136,11 @@ fun ChatScreen(
             }
 
             items(state.messages, key = { it.id }) { message ->
-                MessageBubble(message = message, onExpired = viewModel::triggerLocalExpiry)
+                MessageBubble(
+                    message = message,
+                    onExpired = viewModel::triggerLocalExpiry,
+                    onDeleteMessage = viewModel::deleteMessage
+                )
             }
         }
     }
@@ -248,7 +251,7 @@ private fun SessionStatusBanner() {
                 Icon(Icons.Filled.Lock, null, modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.primary)
                 Text(
-                    "End-to-end encrypted · Messages expire after reading",
+                    "End-to-End Encrypted",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -257,8 +260,13 @@ private fun SessionStatusBanner() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: Message, onExpired: () -> Unit = {}) {
+private fun MessageBubble(
+    message: Message,
+    onExpired: () -> Unit = {},
+    onDeleteMessage: (String, Boolean) -> Unit = { _, _ -> }
+) {
     val isOutgoing = message.isOutgoing
 
     // Rejected/tampered message
@@ -280,7 +288,7 @@ private fun MessageBubble(message: Message, onExpired: () -> Unit = {}) {
                     Icon(Icons.Filled.Warning, null, modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.error)
                     Text(
-                        "⚠ Message verification failed — possible tampering detected.",
+                        "Message verification failed. Possible tampering detected.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -290,14 +298,14 @@ private fun MessageBubble(message: Message, onExpired: () -> Unit = {}) {
         return
     }
 
-    // Expired message — faded
+    // Expired message
     if (message.state == MessageState.EXPIRED) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
             horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
         ) {
             Text(
-                "🔥 Message expired",
+                "Message expired",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -306,84 +314,106 @@ private fun MessageBubble(message: Message, onExpired: () -> Unit = {}) {
         return
     }
 
+    var showMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
     ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp, topEnd = 18.dp,
-                        bottomStart = if (isOutgoing) 18.dp else 4.dp,
-                        bottomEnd = if (isOutgoing) 4.dp else 18.dp
+        Box {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 18.dp, topEnd = 18.dp,
+                            bottomStart = if (isOutgoing) 18.dp else 4.dp,
+                            bottomEnd = if (isOutgoing) 4.dp else 18.dp
+                        )
                     )
-                )
-                .background(
-                    if (isOutgoing) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = message.content,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isOutgoing) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                    .background(
+                        if (isOutgoing) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    .combinedClickable(onClick = {}, onLongClick = { showMenu = true })
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Expiry countdown
-                message.expiryDeadlineMs?.let { deadline ->
-                    val remaining = remember(deadline) {
-                        mutableStateOf(((deadline - System.currentTimeMillis()) / 1000).coerceAtLeast(0))
-                    }
-                    LaunchedEffect(deadline) {
-                        while (remaining.value > 0) {
-                            kotlinx.coroutines.delay(1000)
-                            remaining.value = ((deadline - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
-                        }
-                        onExpired()
-                    }
-                    Text(
-                        text = "🔥 ${formatCountdown(remaining.value)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        color = if (remaining.value < 10) MaterialTheme.colorScheme.error
-                                else if (isOutgoing) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-
+                Text(
+                    text = message.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isOutgoing) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestampMs)),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        color = if (isOutgoing) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                    if (isOutgoing) {
-                        val icon = when (message.state) {
-                            MessageState.SENT -> Icons.Filled.Check
-                            MessageState.DELIVERED -> Icons.Filled.DoneAll
-                            MessageState.FAILED -> Icons.Filled.ErrorOutline
-                            else -> Icons.Filled.Schedule
+                    // Expiry countdown
+                    message.expiryDeadlineMs?.let { deadline ->
+                        val remaining = remember(deadline) {
+                            mutableStateOf(((deadline - System.currentTimeMillis()) / 1000).coerceAtLeast(0))
                         }
-                        val tintColor = if (message.state == MessageState.FAILED)
-                            MaterialTheme.colorScheme.error
-                        else
-                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                        Icon(icon, null, modifier = Modifier.size(12.dp), tint = tintColor)
+                        LaunchedEffect(deadline) {
+                            while (remaining.value > 0) {
+                                kotlinx.coroutines.delay(1000)
+                                remaining.value = ((deadline - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+                            }
+                            onExpired()
+                        }
+                        Text(
+                            text = formatCountdown(remaining.value),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            color = if (remaining.value < 10) MaterialTheme.colorScheme.error
+                                    else if (isOutgoing) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
                     }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestampMs)),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            color = if (isOutgoing) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                        if (isOutgoing) {
+                            val icon = when (message.state) {
+                                MessageState.SENT -> Icons.Filled.Check
+                                MessageState.DELIVERED -> Icons.Filled.DoneAll
+                                MessageState.FAILED -> Icons.Filled.ErrorOutline
+                                else -> Icons.Filled.Schedule
+                            }
+                            val tintColor = if (message.state == MessageState.FAILED)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                            Icon(icon, null, modifier = Modifier.size(12.dp), tint = tintColor)
+                        }
+                    }
+                }
+            }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Delete for me") },
+                    onClick = { showMenu = false; onDeleteMessage(message.id, false) },
+                    leadingIcon = { Icon(Icons.Filled.Delete, null) }
+                )
+                if (isOutgoing) {
+                    DropdownMenuItem(
+                        text = { Text("Delete for both") },
+                        onClick = { showMenu = false; onDeleteMessage(message.id, true) },
+                        leadingIcon = { Icon(Icons.Filled.DeleteForever, null) }
+                    )
                 }
             }
         }
@@ -506,7 +536,6 @@ private fun ExpiryPickerSheet(
 @Composable
 private fun ConnectionTroubleshootCard(
     connectionState: ConnectionState,
-    serverUrl: String,
     onRetry: () -> Unit
 ) {
     Card(
@@ -529,15 +558,8 @@ private fun ConnectionTroubleshootCard(
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
-            if (serverUrl.isNotEmpty()) {
-                Text(
-                    "Server: $serverUrl",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
             Text(
-                "Make sure both devices are on the same network and the server URL is correct in Settings.",
+                "Make sure both devices are online and the server is reachable.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )

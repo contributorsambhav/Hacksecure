@@ -74,7 +74,8 @@ data class ConversationUiItem(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
-    private val identityRepository: IdentityRepository
+    private val identityRepository: IdentityRepository,
+    private val messageRepository: MessageRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -97,6 +98,18 @@ class HomeViewModel @Inject constructor(
                 }
                 _uiState.update { it.copy(conversations = items, isLoading = false) }
             }
+        }
+    }
+
+    fun deleteConversation(contactId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val contact = contactRepository.getContact(contactId) ?: return@launch
+                val myHex = identityRepository.getLocalIdentity()?.identityHex ?: return@launch
+                val convId = buildConversationId(myHex, contact.identityHex)
+                messageRepository.deleteConversationMessages(convId)
+                contactRepository.deleteContact(contactId)
+            } catch (_: Exception) {}
         }
     }
 
@@ -530,7 +543,7 @@ class ChatViewModel @Inject constructor(
                         messageRepository.updateMessageState(messageId, finalState)
                     }
                     if (!sendSuccess) {
-                        _events.emit(ChatEvent.ShowError("Message queued â€” will retry when reconnected"))
+                        _events.emit(ChatEvent.ShowError("Message queued, will retry when reconnected"))
                     }
                 }
                 // wirePacketBytes == null: no-op, message stays as SENDING until session is established
@@ -556,7 +569,18 @@ class ChatViewModel @Inject constructor(
         val convId = conversationId ?: return
         try {
             val (plaintextBytes, header) = withContext(Dispatchers.Default) { processor.receive(packetBytes) }
-            val text = plaintextBytes.toString(Charsets.UTF_8)
+            val text = plaintextBytes.toString(Charsets.UTF_8)            // Handle delete-for-both requests sent by the other party
+            if (text.startsWith("__DEL__:")) {
+                val targetCounter = text.removePrefix("__DEL__:").toLongOrNull()
+                if (targetCounter != null) {
+                    val senderHex = header.senderId.toHexString()
+                    withContext(Dispatchers.IO) {
+                        try { messageRepository.deleteMessageByCounterAndSender(convId, senderHex, targetCounter) }
+                        catch (_: Exception) {}
+                    }
+                }
+                return
+            }
             val now = System.currentTimeMillis()
             val message = Message(
                 id = UUID.randomUUID().toString(),
@@ -600,7 +624,7 @@ class ChatViewModel @Inject constructor(
             }
             if (failedMessages.isEmpty()) return@launch
 
-            _events.emit(ChatEvent.ShowError("${failedMessages.size} message(s) failed â€” will resend when session is ready"))
+            _events.emit(ChatEvent.ShowError("${failedMessages.size} message(s) failed, will resend when session is ready"))
             failedMessages.forEach { message ->
                 withContext(Dispatchers.IO) {
                     messageRepository.updateMessageState(message.id, MessageState.SENDING)
@@ -643,6 +667,37 @@ class ChatViewModel @Inject constructor(
     }
 
     // ── Retry connection ───────────────────────────────────────────────────────
+
+    // Delete a message locally, optionally sending a delete-request to the other device
+    fun deleteMessage(messageId: String, forBoth: Boolean) {
+        val convId = conversationId ?: return
+        viewModelScope.launch {
+            if (forBoth) {
+                val processor = messageProcessor
+                if (processor != null) {
+                    try {
+                        val msg = withContext(Dispatchers.IO) { messageRepository.getMessage(messageId) }
+                        if (msg != null) {
+                            val deletePayload = "__DEL__:${msg.counter}".toByteArray(Charsets.UTF_8)
+                            val result = withContext(Dispatchers.Default) {
+                                processor.send(plaintext = deletePayload, expirySeconds = 0)
+                            }
+                            withContext(Dispatchers.IO) {
+                                backgroundConnectionManager.sendPacket(
+                                    convId = convId,
+                                    messageId = UUID.randomUUID().toString(),
+                                    packet = result.first
+                                )
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            withContext(Dispatchers.IO) {
+                try { messageRepository.deleteMessage(messageId) } catch (_: Exception) {}
+            }
+        }
+    }
 
     /** Re-establish relay connection after a disconnection or URL change. */
     fun retryConnection() {

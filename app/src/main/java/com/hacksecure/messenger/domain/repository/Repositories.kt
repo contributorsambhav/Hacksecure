@@ -25,6 +25,8 @@ interface MessageRepository {
     suspend fun getMessage(id: String): Message?
     suspend fun updateMessageState(messageId: String, state: MessageState)
     suspend fun deleteExpiredMessages()
+    suspend fun deleteMessage(messageId: String)
+    suspend fun deleteMessageByCounterAndSender(convId: String, senderHex: String, counter: Long)
     suspend fun deleteConversationMessages(conversationId: String)
     suspend fun getMaxCounter(conversationId: String, senderHex: String): Long
     /** Returns all outgoing messages in FAILED state for a given conversation. */

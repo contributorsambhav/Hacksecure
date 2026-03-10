@@ -436,31 +436,25 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_hacksecure_messenger_presentation_viewmodel_SplashViewModel = "com.hacksecure.messenger.presentation.viewmodel.SplashViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel";
-
       static String com_hacksecure_messenger_presentation_viewmodel_HomeViewModel = "com.hacksecure.messenger.presentation.viewmodel.HomeViewModel";
 
-      static String com_hacksecure_messenger_presentation_viewmodel_ChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.ChatViewModel";
+      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
 
       static String com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel";
 
       static String com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel = "com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel";
 
-      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
+      static String com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel";
 
-      @KeepFieldType
-      SplashViewModel com_hacksecure_messenger_presentation_viewmodel_SplashViewModel2;
+      static String com_hacksecure_messenger_presentation_viewmodel_SplashViewModel = "com.hacksecure.messenger.presentation.viewmodel.SplashViewModel";
 
-      @KeepFieldType
-      QrScanViewModel com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel2;
+      static String com_hacksecure_messenger_presentation_viewmodel_ChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.ChatViewModel";
 
       @KeepFieldType
       HomeViewModel com_hacksecure_messenger_presentation_viewmodel_HomeViewModel2;
 
       @KeepFieldType
-      ChatViewModel com_hacksecure_messenger_presentation_viewmodel_ChatViewModel2;
+      SettingsViewModel com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel2;
 
       @KeepFieldType
       QrDisplayViewModel com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel2;
@@ -469,7 +463,13 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
       ContactConfirmViewModel com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel2;
 
       @KeepFieldType
-      SettingsViewModel com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel2;
+      QrScanViewModel com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel2;
+
+      @KeepFieldType
+      SplashViewModel com_hacksecure_messenger_presentation_viewmodel_SplashViewModel2;
+
+      @KeepFieldType
+      ChatViewModel com_hacksecure_messenger_presentation_viewmodel_ChatViewModel2;
     }
   }
 
@@ -528,40 +528,40 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
+      static String com_hacksecure_messenger_presentation_viewmodel_ChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.ChatViewModel";
 
       static String com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel = "com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel";
 
-      static String com_hacksecure_messenger_presentation_viewmodel_ChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.ChatViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_HomeViewModel = "com.hacksecure.messenger.presentation.viewmodel.HomeViewModel";
-
       static String com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel";
 
       static String com_hacksecure_messenger_presentation_viewmodel_SplashViewModel = "com.hacksecure.messenger.presentation.viewmodel.SplashViewModel";
 
-      @KeepFieldType
-      QrDisplayViewModel com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel2;
+      static String com_hacksecure_messenger_presentation_viewmodel_HomeViewModel = "com.hacksecure.messenger.presentation.viewmodel.HomeViewModel";
 
-      @KeepFieldType
-      SettingsViewModel com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel2;
-
-      @KeepFieldType
-      ContactConfirmViewModel com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel2;
+      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
 
       @KeepFieldType
       ChatViewModel com_hacksecure_messenger_presentation_viewmodel_ChatViewModel2;
 
       @KeepFieldType
-      HomeViewModel com_hacksecure_messenger_presentation_viewmodel_HomeViewModel2;
+      ContactConfirmViewModel com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel2;
 
       @KeepFieldType
       QrScanViewModel com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel2;
 
       @KeepFieldType
+      QrDisplayViewModel com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel2;
+
+      @KeepFieldType
       SplashViewModel com_hacksecure_messenger_presentation_viewmodel_SplashViewModel2;
+
+      @KeepFieldType
+      HomeViewModel com_hacksecure_messenger_presentation_viewmodel_HomeViewModel2;
+
+      @KeepFieldType
+      SettingsViewModel com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel2;
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
