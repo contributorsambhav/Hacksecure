@@ -4,7 +4,7 @@
             "outputFile": "com.hacksecure.messenger.app-mergeDebugResources-74:/values-he/values-he.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\arung\\.gradle\\caches\\transforms-3\\909ff35b04ae253a3fd0a23509d57c8a\\transformed\\jetified-zxing-android-embedded-4.3.0\\res\\values-he\\values-he.xml",
+                    "source": "/home/sambhav/.gradle/caches/transforms-3/909ff35b04ae253a3fd0a23509d57c8a/transformed/jetified-zxing-android-embedded-4.3.0/res/values-he/values-he.xml",
                     "from": {
                         "startLines": "2,3,4,5",
                         "startColumns": "4,4,4,4",

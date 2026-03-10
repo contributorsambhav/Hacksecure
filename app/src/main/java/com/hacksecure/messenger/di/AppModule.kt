@@ -116,6 +116,12 @@ object AppModule {
         dao: MessageDao,
         keystoreManager: KeystoreManager
     ): MessageRepository = MessageRepositoryImpl(dao, keystoreManager)
+
+    @Provides @Singleton
+    fun provideGhostRepository(
+        relayApi: RelayApi,
+        serverConfig: ServerConfig
+    ): GhostRepository = GhostRepositoryImpl(relayApi, serverConfig)
 }
 
 private fun String.hexToByteArray(): ByteArray {

@@ -55,6 +55,16 @@ const MAX_BUFFER_PER_CONV = 50;
 const BUFFER_TTL_MS = 3_600_000; // 1 hour
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GHOST MODE — IN-MEMORY REGISTRIES (ZERO PERSISTENCE)
+// ══════════════════════════════════════════════════════════════════════════════
+const ghostRegistry = new Map();   // codename → { token, registeredAt, lastHeartbeat }
+const ghostTokenIndex = new Map(); // token → codename (reverse lookup)
+const ghostRequests = new Map();   // targetCodename → [{ requestId, fromCodename, timestamp }]
+const ghostChannels = new Map();   // ghostChannelId → { codenames: [A, B], sockets: Set<ws> }
+const GHOST_HEARTBEAT_TIMEOUT_MS = 60_000;  // 60s no heartbeat → purge
+const GHOST_REQUEST_TTL_MS = 300_000;       // 5 min → auto-delete request
+
+// ══════════════════════════════════════════════════════════════════════════════
 // EXPRESS REST API
 // ══════════════════════════════════════════════════════════════════════════════
 const app = express();
@@ -143,17 +153,268 @@ app.post("/api/v1/presence", (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GHOST MODE REST API
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Helper: validate ghost token from header, returns codename or null. */
+function resolveGhostToken(req) {
+  const token = req.headers["x-ghost-token"];
+  if (!token) return null;
+  return ghostTokenIndex.get(token) || null;
+}
+
+/**
+ * POST /api/v1/ghost/register
+ * Register a codename for ghost mode. Returns a ghostToken.
+ * Body: { codename: string }
+ */
+app.post("/api/v1/ghost/register", (req, res) => {
+  const { codename } = req.body;
+  if (!codename || typeof codename !== "string" || codename.trim().length < 2 || codename.trim().length > 32) {
+    return res.status(400).json({ error: "Codename must be 2-32 characters" });
+  }
+  const name = codename.trim().toUpperCase();
+  if (ghostRegistry.has(name)) {
+    return res.status(409).json({ error: "Codename already taken" });
+  }
+  const token = crypto.randomUUID();
+  const now = Date.now();
+  ghostRegistry.set(name, { token, registeredAt: now, lastHeartbeat: now });
+  ghostTokenIndex.set(token, name);
+  console.log(`👻 Ghost registered: ${name}`);
+  res.json({ ghostToken: token, codename: name });
+});
+
+/**
+ * GET /api/v1/ghost/search?q=<substring>
+ * Search online ghost codenames. Requires X-Ghost-Token header.
+ */
+app.get("/api/v1/ghost/search", (req, res) => {
+  const myCodename = resolveGhostToken(req);
+  if (!myCodename) return res.status(401).json({ error: "Invalid or missing ghost token" });
+  // Heartbeat on any authenticated request
+  const entry = ghostRegistry.get(myCodename);
+  if (entry) entry.lastHeartbeat = Date.now();
+
+  const query = (req.query.q || "").trim().toUpperCase();
+  if (query.length < 1) return res.json({ results: [] });
+
+  const results = [];
+  for (const [name] of ghostRegistry) {
+    if (name !== myCodename && name.includes(query)) {
+      results.push(name);
+      if (results.length >= 20) break;
+    }
+  }
+  res.json({ results });
+});
+
+/**
+ * POST /api/v1/ghost/request
+ * Send a chat request to another ghost codename.
+ * Body: { targetCodename: string }
+ * Requires X-Ghost-Token header.
+ */
+app.post("/api/v1/ghost/request", (req, res) => {
+  const myCodename = resolveGhostToken(req);
+  if (!myCodename) return res.status(401).json({ error: "Invalid ghost token" });
+  const entry = ghostRegistry.get(myCodename);
+  if (entry) entry.lastHeartbeat = Date.now();
+
+  const { targetCodename } = req.body;
+  if (!targetCodename) return res.status(400).json({ error: "targetCodename required" });
+  const target = targetCodename.trim().toUpperCase();
+  if (!ghostRegistry.has(target)) return res.status(404).json({ error: "Target not online" });
+  if (target === myCodename) return res.status(400).json({ error: "Cannot request yourself" });
+
+  const requestId = crypto.randomUUID();
+  const pending = ghostRequests.get(target) || [];
+  // Prevent duplicate requests from same sender
+  if (pending.some(r => r.fromCodename === myCodename)) {
+    return res.status(409).json({ error: "Request already pending" });
+  }
+  pending.push({ requestId, fromCodename: myCodename, timestamp: Date.now() });
+  ghostRequests.set(target, pending);
+  console.log(`👻 Request: ${myCodename} → ${target} (${requestId})`);
+  res.json({ requestId, sent: true });
+});
+
+/**
+ * POST /api/v1/ghost/respond
+ * Accept or reject a chat request.
+ * Body: { requestId: string, accept: boolean }
+ * Requires X-Ghost-Token header.
+ * On accept: creates a ghostChannelId and returns it.
+ */
+app.post("/api/v1/ghost/respond", (req, res) => {
+  const myCodename = resolveGhostToken(req);
+  if (!myCodename) return res.status(401).json({ error: "Invalid ghost token" });
+  const entry = ghostRegistry.get(myCodename);
+  if (entry) entry.lastHeartbeat = Date.now();
+
+  const { requestId, accept } = req.body;
+  if (!requestId) return res.status(400).json({ error: "requestId required" });
+
+  const pending = ghostRequests.get(myCodename) || [];
+  const idx = pending.findIndex(r => r.requestId === requestId);
+  if (idx === -1) return res.status(404).json({ error: "Request not found" });
+
+  const request = pending.splice(idx, 1)[0];
+  if (pending.length === 0) ghostRequests.delete(myCodename);
+  else ghostRequests.set(myCodename, pending);
+
+  if (!accept) {
+    console.log(`👻 Request rejected: ${request.fromCodename} → ${myCodename}`);
+    return res.json({ accepted: false });
+  }
+
+  // Create ghost channel
+  const channelId = crypto.randomUUID();
+  ghostChannels.set(channelId, {
+    codenames: [request.fromCodename, myCodename],
+    sockets: new Set()
+  });
+  console.log(`👻 Channel created: ${channelId} (${request.fromCodename} ↔ ${myCodename})`);
+  res.json({ accepted: true, channelId, peerCodename: request.fromCodename });
+});
+
+/**
+ * GET /api/v1/ghost/poll
+ * Poll for incoming requests and accepted channels.
+ * Requires X-Ghost-Token header.
+ * Returns: { requests: [...], channels: [...] }
+ */
+app.get("/api/v1/ghost/poll", (req, res) => {
+  const myCodename = resolveGhostToken(req);
+  if (!myCodename) return res.status(401).json({ error: "Invalid ghost token" });
+  const entry = ghostRegistry.get(myCodename);
+  if (entry) entry.lastHeartbeat = Date.now();
+
+  // Incoming requests addressed to me
+  const requests = (ghostRequests.get(myCodename) || []).map(r => ({
+    requestId: r.requestId,
+    fromCodename: r.fromCodename,
+    timestamp: r.timestamp
+  }));
+
+  // Channels I'm part of (so the requester can discover the accepted channel)
+  const channels = [];
+  for (const [channelId, ch] of ghostChannels) {
+    if (ch.codenames.includes(myCodename)) {
+      const peer = ch.codenames.find(c => c !== myCodename);
+      channels.push({ channelId, peerCodename: peer });
+    }
+  }
+
+  res.json({ requests, channels });
+});
+
+/**
+ * POST /api/v1/ghost/leave
+ * Explicitly leave ghost mode, cleaning up all state.
+ * Requires X-Ghost-Token header.
+ */
+app.post("/api/v1/ghost/leave", (req, res) => {
+  const myCodename = resolveGhostToken(req);
+  if (!myCodename) return res.status(401).json({ error: "Invalid ghost token" });
+
+  cleanupGhost(myCodename);
+  console.log(`👻 Ghost left: ${myCodename}`);
+  res.json({ left: true });
+});
+
+/** Remove a ghost codename and all its associated state. */
+function cleanupGhost(codename) {
+  const entry = ghostRegistry.get(codename);
+  if (entry) {
+    ghostTokenIndex.delete(entry.token);
+    ghostRegistry.delete(codename);
+  }
+  ghostRequests.delete(codename);
+  // Also remove outgoing requests this codename sent to others
+  for (const [target, reqs] of ghostRequests) {
+    const filtered = reqs.filter(r => r.fromCodename !== codename);
+    if (filtered.length === 0) ghostRequests.delete(target);
+    else ghostRequests.set(target, filtered);
+  }
+  // Destroy any ghost channels involving this codename
+  for (const [channelId, ch] of ghostChannels) {
+    if (ch.codenames.includes(codename)) {
+      // Force-close all sockets in this channel
+      for (const ws of ch.sockets) {
+        try { ws.close(4100, "Ghost channel destroyed"); } catch (_) {}
+      }
+      ghostChannels.delete(channelId);
+      console.log(`👻 Channel destroyed: ${channelId}`);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // WEBSOCKET SERVER
 // ══════════════════════════════════════════════════════════════════════════════
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server, path: "/ws" });
+const wss = new WebSocket.Server({ server });
 
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, "http://localhost");
   const conversationId = url.searchParams.get("conv");
+  const ghostChannelId = url.searchParams.get("ghost");
 
+  // ── Ghost channel WebSocket ──────────────────────────────────────────────
+  if (ghostChannelId) {
+    const channel = ghostChannels.get(ghostChannelId);
+    if (!channel) {
+      ws.close(4010, "Ghost channel not found");
+      return;
+    }
+    if (channel.sockets.size >= 2) {
+      ws.close(4011, "Ghost channel full");
+      return;
+    }
+    channel.sockets.add(ws);
+    ws._ghostChannelId = ghostChannelId;
+    console.log(`👻 Socket joined ghost channel ${ghostChannelId.slice(0, 8)}... (${channel.sockets.size}/2)`);
+
+    ws.on("message", (data, isBinary) => {
+      if (!isBinary) { ws.close(4004, "Binary only"); return; }
+      // Relay to the OTHER socket in this ghost channel — NO BUFFERING
+      for (const peer of channel.sockets) {
+        if (peer !== ws && peer.readyState === WebSocket.OPEN) {
+          peer.send(data, { binary: true });
+        }
+      }
+      // If peer is offline, packet is silently dropped (zero-trace)
+    });
+
+    ws.on("close", () => {
+      channel.sockets.delete(ws);
+      console.log(`👻 Socket left ghost channel ${ghostChannelId.slice(0, 8)}...`);
+      // FORCED DUAL-DISCONNECT: close ALL other sockets in this channel
+      for (const peer of channel.sockets) {
+        try { peer.close(4100, "Peer disconnected — channel destroyed"); } catch (_) {}
+      }
+      // Destroy the channel entirely
+      ghostChannels.delete(ghostChannelId);
+      console.log(`👻 Ghost channel destroyed: ${ghostChannelId.slice(0, 8)}...`);
+    });
+
+    ws.on("error", (err) => {
+      console.error(`👻 Ghost WebSocket error:`, err.message);
+      channel.sockets.delete(ws);
+      // Force-close peers on error too
+      for (const peer of channel.sockets) {
+        try { peer.close(4100, "Peer error — channel destroyed"); } catch (_) {}
+      }
+      ghostChannels.delete(ghostChannelId);
+    });
+
+    return; // Don't fall through to regular conversation handling
+  }
+
+  // ── Regular conversation WebSocket ───────────────────────────────────────
   if (!conversationId) {
-    ws.close(4001, "Missing conv parameter");
+    ws.close(4001, "Missing conv or ghost parameter");
     return;
   }
 
@@ -278,6 +539,36 @@ setInterval(() => {
     if (fresh.length === 0) messageBuffer.delete(convId);
     else messageBuffer.set(convId, fresh);
   }
+
+  // ── Ghost Mode cleanup ─────────────────────────────────────────────────
+  const now = Date.now();
+
+  // Purge ghost codenames with stale heartbeat
+  for (const [codename, entry] of ghostRegistry) {
+    if (now - entry.lastHeartbeat > GHOST_HEARTBEAT_TIMEOUT_MS) {
+      console.log(`👻 Purging stale ghost: ${codename}`);
+      cleanupGhost(codename);
+    }
+  }
+
+  // Purge expired ghost requests
+  for (const [target, reqs] of ghostRequests) {
+    const fresh = reqs.filter(r => now - r.timestamp < GHOST_REQUEST_TTL_MS);
+    if (fresh.length === 0) ghostRequests.delete(target);
+    else ghostRequests.set(target, fresh);
+  }
+
+  // Purge ghost channels with 0 active sockets
+  for (const [channelId, ch] of ghostChannels) {
+    // Remove dead sockets
+    for (const ws of ch.sockets) {
+      if (ws.readyState !== WebSocket.OPEN) ch.sockets.delete(ws);
+    }
+    if (ch.sockets.size === 0) {
+      ghostChannels.delete(channelId);
+      console.log(`👻 Cleaned up empty ghost channel: ${channelId.slice(0, 8)}...`);
+    }
+  }
 }, 60_000);
 
 server.listen(PORT, () => {
@@ -285,5 +576,6 @@ server.listen(PORT, () => {
   console.log(`   Listening on port ${PORT}`);
   console.log(`   REST: http://localhost:${PORT}/api/v1/`);
   console.log(`   WebSocket: ws://localhost:${PORT}/ws?conv=<conversationId>`);
+  console.log(`   Ghost:     ws://localhost:${PORT}/ws?ghost=<ghostChannelId>`);
   console.log(`   Server is BLIND — does not log message content\n`);
 });

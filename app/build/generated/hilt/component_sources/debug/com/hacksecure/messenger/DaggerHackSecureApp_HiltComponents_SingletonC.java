@@ -18,11 +18,13 @@ import com.hacksecure.messenger.data.local.db.LocalIdentityDao;
 import com.hacksecure.messenger.data.local.db.MessageDao;
 import com.hacksecure.messenger.data.local.keystore.KeystoreManager;
 import com.hacksecure.messenger.data.remote.BackgroundConnectionManager;
+import com.hacksecure.messenger.data.remote.GhostConnectionManager;
 import com.hacksecure.messenger.data.remote.ServerConfig;
 import com.hacksecure.messenger.data.remote.api.RelayApi;
 import com.hacksecure.messenger.di.AppModule_ProvideContactDaoFactory;
 import com.hacksecure.messenger.di.AppModule_ProvideContactRepositoryFactory;
 import com.hacksecure.messenger.di.AppModule_ProvideDatabaseFactory;
+import com.hacksecure.messenger.di.AppModule_ProvideGhostRepositoryFactory;
 import com.hacksecure.messenger.di.AppModule_ProvideIdentityKeyManagerFactory;
 import com.hacksecure.messenger.di.AppModule_ProvideIdentityRepositoryFactory;
 import com.hacksecure.messenger.di.AppModule_ProvideKeystoreManagerFactory;
@@ -36,12 +38,17 @@ import com.hacksecure.messenger.domain.crypto.HandshakeManager;
 import com.hacksecure.messenger.domain.crypto.IdentityKeyManager;
 import com.hacksecure.messenger.domain.crypto.SessionKeyManager;
 import com.hacksecure.messenger.domain.repository.ContactRepository;
+import com.hacksecure.messenger.domain.repository.GhostRepository;
 import com.hacksecure.messenger.domain.repository.IdentityRepository;
 import com.hacksecure.messenger.domain.repository.MessageRepository;
 import com.hacksecure.messenger.presentation.viewmodel.ChatViewModel;
 import com.hacksecure.messenger.presentation.viewmodel.ChatViewModel_HiltModules;
 import com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel;
 import com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel_HiltModules;
+import com.hacksecure.messenger.presentation.viewmodel.GhostChatViewModel;
+import com.hacksecure.messenger.presentation.viewmodel.GhostChatViewModel_HiltModules;
+import com.hacksecure.messenger.presentation.viewmodel.GhostLobbyViewModel;
+import com.hacksecure.messenger.presentation.viewmodel.GhostLobbyViewModel_HiltModules;
 import com.hacksecure.messenger.presentation.viewmodel.HomeViewModel;
 import com.hacksecure.messenger.presentation.viewmodel.HomeViewModel_HiltModules;
 import com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel;
@@ -416,7 +423,7 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
 
     @Override
     public Map<Class<?>, Boolean> getViewModelKeys() {
-      return LazyClassKeyMap.<Boolean>of(MapBuilder.<String, Boolean>newMapBuilder(7).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ChatViewModel, ChatViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel, ContactConfirmViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_HomeViewModel, HomeViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel, QrDisplayViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel, QrScanViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel, SettingsViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SplashViewModel, SplashViewModel_HiltModules.KeyModule.provide()).build());
+      return LazyClassKeyMap.<Boolean>of(MapBuilder.<String, Boolean>newMapBuilder(9).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ChatViewModel, ChatViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel, ContactConfirmViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_GhostChatViewModel, GhostChatViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_GhostLobbyViewModel, GhostLobbyViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_HomeViewModel, HomeViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel, QrDisplayViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel, QrScanViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel, SettingsViewModel_HiltModules.KeyModule.provide()).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SplashViewModel, SplashViewModel_HiltModules.KeyModule.provide()).build());
     }
 
     @Override
@@ -436,37 +443,47 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_ChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.ChatViewModel";
+      static String com_hacksecure_messenger_presentation_viewmodel_GhostLobbyViewModel = "com.hacksecure.messenger.presentation.viewmodel.GhostLobbyViewModel";
 
       static String com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel = "com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel";
 
+      static String com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_ChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.ChatViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_GhostChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.GhostChatViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
+
       static String com_hacksecure_messenger_presentation_viewmodel_SplashViewModel = "com.hacksecure.messenger.presentation.viewmodel.SplashViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel";
 
       static String com_hacksecure_messenger_presentation_viewmodel_HomeViewModel = "com.hacksecure.messenger.presentation.viewmodel.HomeViewModel";
 
       @KeepFieldType
-      QrDisplayViewModel com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel2;
-
-      @KeepFieldType
-      SettingsViewModel com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel2;
-
-      @KeepFieldType
-      QrScanViewModel com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel2;
-
-      @KeepFieldType
-      ChatViewModel com_hacksecure_messenger_presentation_viewmodel_ChatViewModel2;
+      GhostLobbyViewModel com_hacksecure_messenger_presentation_viewmodel_GhostLobbyViewModel2;
 
       @KeepFieldType
       ContactConfirmViewModel com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel2;
 
       @KeepFieldType
+      QrDisplayViewModel com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel2;
+
+      @KeepFieldType
+      ChatViewModel com_hacksecure_messenger_presentation_viewmodel_ChatViewModel2;
+
+      @KeepFieldType
+      GhostChatViewModel com_hacksecure_messenger_presentation_viewmodel_GhostChatViewModel2;
+
+      @KeepFieldType
+      SettingsViewModel com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel2;
+
+      @KeepFieldType
       SplashViewModel com_hacksecure_messenger_presentation_viewmodel_SplashViewModel2;
+
+      @KeepFieldType
+      QrScanViewModel com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel2;
 
       @KeepFieldType
       HomeViewModel com_hacksecure_messenger_presentation_viewmodel_HomeViewModel2;
@@ -483,6 +500,10 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
     private Provider<ChatViewModel> chatViewModelProvider;
 
     private Provider<ContactConfirmViewModel> contactConfirmViewModelProvider;
+
+    private Provider<GhostChatViewModel> ghostChatViewModelProvider;
+
+    private Provider<GhostLobbyViewModel> ghostLobbyViewModelProvider;
 
     private Provider<HomeViewModel> homeViewModelProvider;
 
@@ -509,16 +530,18 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
         final ViewModelLifecycle viewModelLifecycleParam) {
       this.chatViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 0);
       this.contactConfirmViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 1);
-      this.homeViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
-      this.qrDisplayViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
-      this.qrScanViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 4);
-      this.settingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 5);
-      this.splashViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 6);
+      this.ghostChatViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
+      this.ghostLobbyViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
+      this.homeViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 4);
+      this.qrDisplayViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 5);
+      this.qrScanViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 6);
+      this.settingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 7);
+      this.splashViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 8);
     }
 
     @Override
     public Map<Class<?>, javax.inject.Provider<ViewModel>> getHiltViewModelMap() {
-      return LazyClassKeyMap.<javax.inject.Provider<ViewModel>>of(MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(7).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ChatViewModel, ((Provider) chatViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel, ((Provider) contactConfirmViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_HomeViewModel, ((Provider) homeViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel, ((Provider) qrDisplayViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel, ((Provider) qrScanViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel, ((Provider) settingsViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SplashViewModel, ((Provider) splashViewModelProvider)).build());
+      return LazyClassKeyMap.<javax.inject.Provider<ViewModel>>of(MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(9).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ChatViewModel, ((Provider) chatViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel, ((Provider) contactConfirmViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_GhostChatViewModel, ((Provider) ghostChatViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_GhostLobbyViewModel, ((Provider) ghostLobbyViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_HomeViewModel, ((Provider) homeViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel, ((Provider) qrDisplayViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel, ((Provider) qrScanViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel, ((Provider) settingsViewModelProvider)).put(LazyClassKeyProvider.com_hacksecure_messenger_presentation_viewmodel_SplashViewModel, ((Provider) splashViewModelProvider)).build());
     }
 
     @Override
@@ -528,40 +551,50 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel";
-
       static String com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel = "com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_HomeViewModel = "com.hacksecure.messenger.presentation.viewmodel.HomeViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel";
-
-      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
 
       static String com_hacksecure_messenger_presentation_viewmodel_ChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.ChatViewModel";
 
+      static String com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel = "com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_HomeViewModel = "com.hacksecure.messenger.presentation.viewmodel.HomeViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_GhostChatViewModel = "com.hacksecure.messenger.presentation.viewmodel.GhostChatViewModel";
+
+      static String com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel = "com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel";
+
       static String com_hacksecure_messenger_presentation_viewmodel_SplashViewModel = "com.hacksecure.messenger.presentation.viewmodel.SplashViewModel";
 
-      @KeepFieldType
-      QrScanViewModel com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel2;
+      static String com_hacksecure_messenger_presentation_viewmodel_GhostLobbyViewModel = "com.hacksecure.messenger.presentation.viewmodel.GhostLobbyViewModel";
 
       @KeepFieldType
       ContactConfirmViewModel com_hacksecure_messenger_presentation_viewmodel_ContactConfirmViewModel2;
 
       @KeepFieldType
-      HomeViewModel com_hacksecure_messenger_presentation_viewmodel_HomeViewModel2;
+      ChatViewModel com_hacksecure_messenger_presentation_viewmodel_ChatViewModel2;
+
+      @KeepFieldType
+      QrScanViewModel com_hacksecure_messenger_presentation_viewmodel_QrScanViewModel2;
 
       @KeepFieldType
       QrDisplayViewModel com_hacksecure_messenger_presentation_viewmodel_QrDisplayViewModel2;
 
       @KeepFieldType
+      HomeViewModel com_hacksecure_messenger_presentation_viewmodel_HomeViewModel2;
+
+      @KeepFieldType
+      GhostChatViewModel com_hacksecure_messenger_presentation_viewmodel_GhostChatViewModel2;
+
+      @KeepFieldType
       SettingsViewModel com_hacksecure_messenger_presentation_viewmodel_SettingsViewModel2;
 
       @KeepFieldType
-      ChatViewModel com_hacksecure_messenger_presentation_viewmodel_ChatViewModel2;
+      SplashViewModel com_hacksecure_messenger_presentation_viewmodel_SplashViewModel2;
 
       @KeepFieldType
-      SplashViewModel com_hacksecure_messenger_presentation_viewmodel_SplashViewModel2;
+      GhostLobbyViewModel com_hacksecure_messenger_presentation_viewmodel_GhostLobbyViewModel2;
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {
@@ -591,19 +624,25 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
           case 1: // com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel 
           return (T) new ContactConfirmViewModel(singletonCImpl.provideContactRepositoryProvider.get());
 
-          case 2: // com.hacksecure.messenger.presentation.viewmodel.HomeViewModel 
+          case 2: // com.hacksecure.messenger.presentation.viewmodel.GhostChatViewModel 
+          return (T) new GhostChatViewModel(singletonCImpl.ghostConnectionManagerProvider.get(), singletonCImpl.provideIdentityKeyManagerProvider.get());
+
+          case 3: // com.hacksecure.messenger.presentation.viewmodel.GhostLobbyViewModel 
+          return (T) new GhostLobbyViewModel(singletonCImpl.provideGhostRepositoryProvider.get(), singletonCImpl.ghostConnectionManagerProvider.get());
+
+          case 4: // com.hacksecure.messenger.presentation.viewmodel.HomeViewModel 
           return (T) new HomeViewModel(singletonCImpl.provideContactRepositoryProvider.get(), singletonCImpl.provideIdentityRepositoryProvider.get(), singletonCImpl.provideMessageRepositoryProvider.get());
 
-          case 3: // com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel 
+          case 5: // com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel 
           return (T) new QrDisplayViewModel(singletonCImpl.provideIdentityRepositoryProvider.get());
 
-          case 4: // com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel 
+          case 6: // com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel 
           return (T) new QrScanViewModel();
 
-          case 5: // com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel 
+          case 7: // com.hacksecure.messenger.presentation.viewmodel.SettingsViewModel 
           return (T) new SettingsViewModel(singletonCImpl.provideIdentityRepositoryProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule), singletonCImpl.serverConfigProvider.get());
 
-          case 6: // com.hacksecure.messenger.presentation.viewmodel.SplashViewModel 
+          case 8: // com.hacksecure.messenger.presentation.viewmodel.SplashViewModel 
           return (T) new SplashViewModel(singletonCImpl.provideIdentityRepositoryProvider.get());
 
           default: throw new AssertionError(id);
@@ -712,6 +751,10 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
 
     private Provider<BackgroundConnectionManager> backgroundConnectionManagerProvider;
 
+    private Provider<GhostConnectionManager> ghostConnectionManagerProvider;
+
+    private Provider<GhostRepository> provideGhostRepositoryProvider;
+
     private SingletonCImpl(ApplicationContextModule applicationContextModuleParam) {
       this.applicationContextModule = applicationContextModuleParam;
       initialize(applicationContextModuleParam);
@@ -754,6 +797,8 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
       this.provideRelayApiProvider = DoubleCheck.provider(new SwitchingProvider<RelayApi>(singletonCImpl, 10));
       this.serverConfigProvider = DoubleCheck.provider(new SwitchingProvider<ServerConfig>(singletonCImpl, 12));
       this.backgroundConnectionManagerProvider = DoubleCheck.provider(new SwitchingProvider<BackgroundConnectionManager>(singletonCImpl, 4));
+      this.ghostConnectionManagerProvider = DoubleCheck.provider(new SwitchingProvider<GhostConnectionManager>(singletonCImpl, 13));
+      this.provideGhostRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<GhostRepository>(singletonCImpl, 14));
     }
 
     @Override
@@ -839,6 +884,12 @@ public final class DaggerHackSecureApp_HiltComponents_SingletonC {
 
           case 12: // com.hacksecure.messenger.data.remote.ServerConfig 
           return (T) new ServerConfig(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+
+          case 13: // com.hacksecure.messenger.data.remote.GhostConnectionManager 
+          return (T) new GhostConnectionManager(singletonCImpl.handshakeManagerProvider.get(), singletonCImpl.provideIdentityKeyManagerProvider.get(), singletonCImpl.serverConfigProvider.get(), singletonCImpl.provideOkHttpClientProvider.get());
+
+          case 14: // com.hacksecure.messenger.domain.repository.GhostRepository 
+          return (T) AppModule_ProvideGhostRepositoryFactory.provideGhostRepository(singletonCImpl.provideRelayApiProvider.get(), singletonCImpl.serverConfigProvider.get());
 
           default: throw new AssertionError(id);
         }

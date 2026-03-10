@@ -75,6 +75,17 @@ class RelayWebSocketClient(
         isConnected = false
     }
 
+    /**
+     * Connect to a ghost channel. Ghost connections do NOT auto-reconnect —
+     * when the channel is destroyed, the WebSocket is closed permanently.
+     */
+    fun connectGhost(ghostChannelId: String) {
+        currentConversationId = ghostChannelId
+        currentAuthToken = ""
+        shouldReconnect = false  // Ghost channels never reconnect
+        connectInternalGhost(ghostChannelId)
+    }
+
     fun isConnected(): Boolean = isConnected
 
     /**
@@ -195,6 +206,83 @@ class RelayWebSocketClient(
         // Close the stale WebSocket AFTER the new one is assigned, so `isActive()` checks
         // from the stale WS's callbacks correctly detect it as inactive and bail out early.
         staleWs?.close(1000, "Reconnecting")
+    }
+
+    /**
+     * Internal connection method for ghost channels — connects to /ws?ghost=<channelId>.
+     * Ghost channels do NOT auto-reconnect.
+     */
+    private fun connectInternalGhost(ghostChannelId: String) {
+        val url = "${serverConfig.relayBaseUrl}/ws?ghost=$ghostChannelId"
+        val request = Request.Builder().url(url).build()
+
+        val staleWs = webSocket
+
+        webSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {
+            private fun WebSocket.isActive() = this === this@RelayWebSocketClient.webSocket
+
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                if (!webSocket.isActive()) return
+                Log.d(TAG, "Ghost WebSocket connected to channel ${ghostChannelId.take(8)}...")
+                isConnected = true
+                reconnectAttempts = 0
+                _events.tryEmit(RelayEvent.Connected)
+            }
+
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                if (!webSocket.isActive()) return
+                try {
+                    val data = bytes.toByteArray()
+                    if (data.size < 6) {
+                        Log.w(TAG, "Ghost relay message too short (${data.size} bytes), discarding")
+                        return
+                    }
+                    val buf = java.nio.ByteBuffer.wrap(data)
+                    val convLen = buf.short.toInt()
+                    if (convLen <= 0 || convLen > buf.remaining()) return
+                    val convId = ByteArray(convLen).also { buf.get(it) }.toString(Charsets.UTF_8)
+                    val msgIdLen = buf.short.toInt()
+                    if (msgIdLen <= 0 || msgIdLen > buf.remaining()) return
+                    val msgId = ByteArray(msgIdLen).also { buf.get(it) }.toString(Charsets.UTF_8)
+                    val packetBytes = ByteArray(buf.remaining()).also { buf.get(it) }
+
+                    _events.tryEmit(RelayEvent.MessageReceived(
+                        RawRelayMessage(convId, msgId, packetBytes)
+                    ))
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to parse ghost relay message", e)
+                }
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                if (!webSocket.isActive()) return
+                Log.w(TAG, "Unexpected text frame on ghost channel, ignoring")
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                if (!webSocket.isActive()) return
+                webSocket.close(1000, null)
+                isConnected = false
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                if (!webSocket.isActive()) return
+                Log.d(TAG, "Ghost WebSocket closed: $code $reason")
+                isConnected = false
+                _events.tryEmit(RelayEvent.Disconnected)
+                // NO reconnect for ghost channels — channel is permanently destroyed
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (!webSocket.isActive()) return
+                Log.e(TAG, "Ghost WebSocket failure", t)
+                isConnected = false
+                _events.tryEmit(RelayEvent.Error(t))
+                // NO reconnect for ghost channels
+            }
+        })
+
+        staleWs?.close(1000, "Reconnecting ghost")
     }
 
     private fun scheduleReconnect(conversationId: String, authToken: String) {

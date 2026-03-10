@@ -100,6 +100,7 @@ fun HomeScreen(
     onNavigateToQrScan: () -> Unit,
     onNavigateToChat: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToGhostMode: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -136,6 +137,9 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToGhostMode) {
+                        Text("👻", fontSize = 20.sp)
+                    }
                     IconButton(onClick = onNavigateToQrDisplay) {
                         Icon(Icons.Filled.QrCode, "My QR Code")
                     }

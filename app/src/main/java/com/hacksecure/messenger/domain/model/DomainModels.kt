@@ -171,6 +171,38 @@ sealed class CryptoError : Exception() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GHOST MODE — EPHEMERAL MODELS (RAM ONLY, NEVER PERSISTED)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Identity for a ghost session — exists only in memory. */
+data class GhostIdentity(
+    val codename: String,                // chosen by agent
+    val ghostToken: String               // server-issued session token (UUID)
+)
+
+/** Incoming chat request from another ghost agent. */
+data class GhostChatRequest(
+    val requestId: String,
+    val fromCodename: String,
+    val timestamp: Long
+)
+
+/** An active ghost channel after a request is accepted. */
+data class GhostChannel(
+    val channelId: String,
+    val peerCodename: String,
+    val anonymousId: String              // displayed in chat instead of codename
+)
+
+/** A single message in a ghost chat — lives only in ViewModel state. */
+data class GhostMessage(
+    val id: String,
+    val content: String,
+    val isOutgoing: Boolean,
+    val timestampMs: Long
+)
+
+// ══════════════════════════════════════════════════════════════════════════════
 // UTILITY EXTENSION
 // ══════════════════════════════════════════════════════════════════════════════
 fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }

@@ -25,9 +25,13 @@ object Routes {
     const val CONTACT_CONFIRM = "contact_confirm/{pubKeyB64}"
     const val CHAT = "chat/{contactId}"
     const val SETTINGS = "settings"
+    const val GHOST_LOBBY = "ghost_lobby"
+    const val GHOST_CHAT = "ghost_chat/{channelId}/{peerCodename}/{anonymousId}"
 
     fun contactConfirm(pubKeyB64: String) = "contact_confirm/$pubKeyB64"
     fun chat(contactId: String) = "chat/$contactId"
+    fun ghostChat(channelId: String, peerCodename: String, anonymousId: String) =
+        "ghost_chat/${java.net.URLEncoder.encode(channelId, "UTF-8")}/${java.net.URLEncoder.encode(peerCodename, "UTF-8")}/${java.net.URLEncoder.encode(anonymousId, "UTF-8")}"
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -92,7 +96,8 @@ fun HackSecureNavGraph() {
                 onNavigateToQrDisplay = { navController.navigate(Routes.QR_DISPLAY) },
                 onNavigateToQrScan = { navController.navigate(Routes.QR_SCAN) },
                 onNavigateToChat = { contactId -> navController.navigate(Routes.chat(contactId)) },
-                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) }
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToGhostMode = { navController.navigate(Routes.GHOST_LOBBY) }
             )
         }
 
@@ -145,6 +150,47 @@ fun HackSecureNavGraph() {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToQrDisplay = { navController.navigate(Routes.QR_DISPLAY) }
+            )
+        }
+
+        // ── Ghost Mode ──────────────────────────────────────────────────────
+        composable(Routes.GHOST_LOBBY) {
+            GhostLobbyScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToGhostChat = { channelId, peerCodename, anonymousId ->
+                    navController.navigate(Routes.ghostChat(channelId, peerCodename, anonymousId)) {
+                        popUpTo(Routes.GHOST_LOBBY) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            Routes.GHOST_CHAT,
+            arguments = listOf(
+                navArgument("channelId") { type = NavType.StringType },
+                navArgument("peerCodename") { type = NavType.StringType },
+                navArgument("anonymousId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val channelId = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("channelId") ?: "", "UTF-8"
+            )
+            val peerCodename = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("peerCodename") ?: "", "UTF-8"
+            )
+            val anonymousId = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("anonymousId") ?: "", "UTF-8"
+            )
+            GhostChatScreen(
+                channelId = channelId,
+                peerCodename = peerCodename,
+                anonymousId = anonymousId,
+                onBack = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
+                }
             )
         }
     }

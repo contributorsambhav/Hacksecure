@@ -4,6 +4,8 @@ import androidx.hilt.work.HiltWrapper_WorkerFactoryModule;
 import com.hacksecure.messenger.di.AppModule;
 import com.hacksecure.messenger.presentation.viewmodel.ChatViewModel_HiltModules;
 import com.hacksecure.messenger.presentation.viewmodel.ContactConfirmViewModel_HiltModules;
+import com.hacksecure.messenger.presentation.viewmodel.GhostChatViewModel_HiltModules;
+import com.hacksecure.messenger.presentation.viewmodel.GhostLobbyViewModel_HiltModules;
 import com.hacksecure.messenger.presentation.viewmodel.HomeViewModel_HiltModules;
 import com.hacksecure.messenger.presentation.viewmodel.QrDisplayViewModel_HiltModules;
 import com.hacksecure.messenger.presentation.viewmodel.QrScanViewModel_HiltModules;
@@ -165,6 +167,8 @@ public final class HackSecureApp_HiltComponents {
       modules = {
           ChatViewModel_HiltModules.KeyModule.class,
           ContactConfirmViewModel_HiltModules.KeyModule.class,
+          GhostChatViewModel_HiltModules.KeyModule.class,
+          GhostLobbyViewModel_HiltModules.KeyModule.class,
           ActivityCBuilderModule.class,
           ViewModelCBuilderModule.class,
           HiltWrapper_ActivityRetainedComponentManager_LifecycleModule.class,
@@ -211,6 +215,8 @@ public final class HackSecureApp_HiltComponents {
       modules = {
           ChatViewModel_HiltModules.BindsModule.class,
           ContactConfirmViewModel_HiltModules.BindsModule.class,
+          GhostChatViewModel_HiltModules.BindsModule.class,
+          GhostLobbyViewModel_HiltModules.BindsModule.class,
           HiltWrapper_HiltViewModelFactory_ViewModelModule.class,
           HomeViewModel_HiltModules.BindsModule.class,
           QrDisplayViewModel_HiltModules.BindsModule.class,

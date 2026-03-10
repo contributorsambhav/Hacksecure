@@ -32,3 +32,13 @@ interface MessageRepository {
     /** Returns all outgoing messages in FAILED state for a given conversation. */
     suspend fun getFailedMessages(conversationId: String): List<Message>
 }
+
+interface GhostRepository {
+    suspend fun register(codename: String): GhostIdentity
+    suspend fun searchOnlineUsers(query: String, ghostToken: String): List<String>
+    suspend fun sendChatRequest(targetCodename: String, ghostToken: String): String?
+    suspend fun pollRequests(ghostToken: String): Pair<List<GhostChatRequest>, List<GhostChannel>>
+    suspend fun acceptRequest(requestId: String, ghostToken: String): GhostChannel?
+    suspend fun rejectRequest(requestId: String, ghostToken: String): Boolean
+    suspend fun leave(ghostToken: String)
+}

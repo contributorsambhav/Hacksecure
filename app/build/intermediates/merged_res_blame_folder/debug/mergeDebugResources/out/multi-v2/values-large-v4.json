@@ -4,7 +4,7 @@
             "outputFile": "com.hacksecure.messenger.app-mergeDebugResources-74:/values-large-v4/values-large-v4.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\arung\\.gradle\\caches\\transforms-3\\9b917e80110422dd57eff6f697dcb751\\transformed\\appcompat-1.1.0\\res\\values-large-v4\\values-large-v4.xml",
+                    "source": "/home/sambhav/.gradle/caches/transforms-3/9b917e80110422dd57eff6f697dcb751/transformed/appcompat-1.1.0/res/values-large-v4/values-large-v4.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10",
                         "startColumns": "4,4,4,4,4,4,4,4,4",
