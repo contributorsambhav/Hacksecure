@@ -215,7 +215,7 @@ private fun ConnectionIndicator(state: ConnectionState) {
 
 private val ConnectionState.label get() = when (this) {
     ConnectionState.CONNECTED_P2P -> "Direct P2P"
-    ConnectionState.CONNECTED_RELAY -> "Relay"
+    ConnectionState.CONNECTED_RELAY -> "Online"
     ConnectionState.CONNECTING -> "Connecting..."
     ConnectionState.DISCONNECTED -> "Disconnected"
     ConnectionState.ERROR -> "Connection Error"
