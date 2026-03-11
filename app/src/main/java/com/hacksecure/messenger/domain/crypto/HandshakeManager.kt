@@ -109,7 +109,8 @@ class HandshakeManager @Inject constructor(
         peerIdentityPublicKey: ByteArray,
         ourEphemeralPair: SessionKeyManager.EphemeralKeyPair,
         myIdentityHash: ByteArray,
-        peerIdentityHash: ByteArray
+        peerIdentityHash: ByteArray,
+        skipSignatureVerification: Boolean = false
     ): ByteArray {
         require(offerBytes.size == OFFER_SIZE) { "Offer must be $OFFER_SIZE bytes, got ${offerBytes.size}" }
         require(offerBytes[0] == PACKET_TYPE) { "First byte is not HANDSHAKE magic" }
@@ -118,10 +119,12 @@ class HandshakeManager @Inject constructor(
         val signature = offerBytes.copyOfRange(33, 97)
 
         // Verify Ed25519 signature over (type || ephemeral_pubkey)
-        val signedData = offerBytes.copyOfRange(0, 33)
-        val signingDigest = MessageDigest.getInstance("SHA-256").digest(signedData)
-        if (!Ed25519Verifier.verify(peerIdentityPublicKey, signingDigest, signature)) {
-            throw CryptoError.SignatureInvalid
+        if (!skipSignatureVerification) {
+            val signedData = offerBytes.copyOfRange(0, 33)
+            val signingDigest = MessageDigest.getInstance("SHA-256").digest(signedData)
+            if (!Ed25519Verifier.verify(peerIdentityPublicKey, signingDigest, signature)) {
+                throw CryptoError.SignatureInvalid
+            }
         }
 
         // X25519 shared secret — ephemeral private key is zeroized inside this call

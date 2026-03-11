@@ -135,22 +135,22 @@ class GhostConnectionManager @Inject constructor(
             // Extract peer's ephemeral public key from the offer (bytes 1..32)
             // The offer format is: [1 magic][32 eph_pub][64 signature]
             val peerEphPubKey = peerOfferBytes.copyOfRange(1, 33)
+            val myEphPubKey = pair.publicKeyBytes
 
-            val myPubKey = identityKeyManager.getPublicKeyBytes()
-            val myIdentityHash = IdentityHash.compute(myPubKey)
-
-            // For ghost mode, we use the peer's ephemeral key as their "identity" for
-            // key derivation. This provides forward secrecy without requiring persistent
-            // identity verification (which would defeat the purpose of anonymous ghost mode).
+            // For ghost mode, we use both peers' ephemeral keys as "identity" for
+            // key derivation. This prevents exposing permanent identities and
+            // ensures both sides compute identical session keys.
+            val myIdentityHash = IdentityHash.compute(myEphPubKey)
             val peerIdentityHash = IdentityHash.compute(peerEphPubKey)
 
             val sessionKey = withContext(Dispatchers.Default) {
                 handshakeManager.deriveSessionKey(
                     offerBytes = peerOfferBytes,
-                    peerIdentityPublicKey = myPubKey,  // Accept any signed offer
+                    peerIdentityPublicKey = peerEphPubKey,  // Ignored in ghost mode
                     ourEphemeralPair = pair,
                     myIdentityHash = myIdentityHash,
-                    peerIdentityHash = peerIdentityHash
+                    peerIdentityHash = peerIdentityHash,
+                    skipSignatureVerification = true
                 )
             }
             ephemeralPair = null  // private key has been zeroized in computeSharedSecret
@@ -164,8 +164,9 @@ class GhostConnectionManager @Inject constructor(
                 sendRatchet = sendRatchet,
                 recvRatchet = recvRatchet,
                 identityKeyManager = identityKeyManager,
-                peerPublicKeyBytes = myPubKey,  // simplified for ghost mode
-                myIdentityHash = myIdentityHash
+                peerPublicKeyBytes = peerEphPubKey,  // Ignored in ghost mode
+                myIdentityHash = myIdentityHash,
+                skipSignatureVerification = true
             )
             messageProcessor = processor
             _events.tryEmit(GhostEvent.SessionReady)

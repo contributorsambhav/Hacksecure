@@ -53,6 +53,8 @@ class GhostLobbyViewModel @Inject constructor(
 
     private var pollJob: Job? = null
 
+    private var isNavigatingToChat = false
+
     fun updateCodename(name: String) {
         _uiState.update { it.copy(codename = name, error = null) }
     }
@@ -132,6 +134,7 @@ class GhostLobbyViewModel @Inject constructor(
                 }
                 if (channel != null) {
                     _uiState.update { it.copy(acceptedChannel = channel) }
+                    isNavigatingToChat = true
                     _events.emit(GhostLobbyEvent.NavigateToChat(
                         channelId = channel.channelId,
                         peerCodename = channel.peerCodename,
@@ -172,6 +175,7 @@ class GhostLobbyViewModel @Inject constructor(
                     // If a channel has been created (request we sent was accepted), navigate
                     if (channels.isNotEmpty()) {
                         val channel = channels.first()
+                        isNavigatingToChat = true
                         _events.emit(GhostLobbyEvent.NavigateToChat(
                             channelId = channel.channelId,
                             peerCodename = channel.peerCodename,
@@ -198,7 +202,7 @@ class GhostLobbyViewModel @Inject constructor(
         super.onCleared()
         pollJob?.cancel()
         val token = _uiState.value.ghostToken
-        if (token.isNotBlank()) {
+        if (token.isNotBlank() && !isNavigatingToChat) {
             CoroutineScope(Dispatchers.IO).launch {
                 try { ghostRepository.leave(token) } catch (_: Exception) {}
             }

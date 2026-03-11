@@ -390,23 +390,17 @@ wss.on("connection", (ws, req) => {
     ws.on("close", () => {
       channel.sockets.delete(ws);
       console.log(`👻 Socket left ghost channel ${ghostChannelId.slice(0, 8)}...`);
-      // FORCED DUAL-DISCONNECT: close ALL other sockets in this channel
-      for (const peer of channel.sockets) {
-        try { peer.close(4100, "Peer disconnected — channel destroyed"); } catch (_) {}
-      }
-      // Destroy the channel entirely
-      ghostChannels.delete(ghostChannelId);
-      console.log(`👻 Ghost channel destroyed: ${ghostChannelId.slice(0, 8)}...`);
+      // Relaxed rule: DO NOT force-close the OTHER socket. Let the user stay in the UI, 
+      // or let them explicitly exit if they choose to.
+      // We also do not delete the ghostChannelId right away so the channel can 
+      // theoretically be rejoined if they quickly reconnect (if app supported it)
+      // or at least it won't abruptly throw the active participant out.
     });
 
     ws.on("error", (err) => {
       console.error(`👻 Ghost WebSocket error:`, err.message);
       channel.sockets.delete(ws);
-      // Force-close peers on error too
-      for (const peer of channel.sockets) {
-        try { peer.close(4100, "Peer error — channel destroyed"); } catch (_) {}
-      }
-      ghostChannels.delete(ghostChannelId);
+      // Relaxed rule: DO NOT force-close the OTHER socket here either.
     });
 
     return; // Don't fall through to regular conversation handling
@@ -546,8 +540,21 @@ setInterval(() => {
   // Purge ghost codenames with stale heartbeat
   for (const [codename, entry] of ghostRegistry) {
     if (now - entry.lastHeartbeat > GHOST_HEARTBEAT_TIMEOUT_MS) {
-      console.log(`👻 Purging stale ghost: ${codename}`);
-      cleanupGhost(codename);
+      // Check if they are in an active ghost channel (if so, keep them alive)
+      let inActiveChannel = false;
+      for (const [channelId, ch] of ghostChannels) {
+        if (ch.codenames.includes(codename)) {
+          inActiveChannel = true;
+          // Optionally update heartbeat so they don't immediately purge on disconnect
+          entry.lastHeartbeat = now;
+          break;
+        }
+      }
+      
+      if (!inActiveChannel) {
+        console.log(`👻 Purging stale ghost: ${codename}`);
+        cleanupGhost(codename);
+      }
     }
   }
 
